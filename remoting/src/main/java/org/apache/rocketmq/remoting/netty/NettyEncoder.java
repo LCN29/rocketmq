@@ -34,6 +34,9 @@ public class NettyEncoder extends MessageToByteEncoder<RemotingCommand> {
     public void encode(ChannelHandlerContext ctx, RemotingCommand remotingCommand, ByteBuf out)
         throws Exception {
         try {
+            // 头部编码
+            // 把 CommandCustomHeader 中的属性解析后存放到自身的 HashMap<String, String> extFields
+            // 把 remotingCommand 转为 json, 然后转为 byte[] 写入到 out 中
             remotingCommand.fastEncodeHeader(out);
             byte[] body = remotingCommand.getBody();
             if (body != null) {

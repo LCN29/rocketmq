@@ -39,6 +39,15 @@ public class NettyDecoder extends LengthFieldBasedFrameDecoder {
     public Object decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
         ByteBuf frame = null;
         try {
+            // 调用 LengthFieldBasedFrameDecoder 的 decode 方法
+            // 在构造函数中, 设置了前 4 个字节跳过, 不读取
+
+            // 理论上 byteBuffer 内容为
+            // 前 4 个字节表示整个 byte 的长度
+            // 后面 4 个字节表示 header 的长度
+            // 再后面就是 header 的内容
+            // 最后就是 body 的内容
+            // 经过 LengthFieldBasedFrameDecoder 的 decode 方法后, 前 4 位舍弃
             frame = (ByteBuf) super.decode(ctx, in);
             if (null == frame) {
                 return null;
