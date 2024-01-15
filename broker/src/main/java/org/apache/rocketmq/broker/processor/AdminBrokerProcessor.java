@@ -19,6 +19,7 @@ package org.apache.rocketmq.broker.processor;
 import com.alibaba.fastjson.JSON;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import java.util.Arrays;
 import org.apache.rocketmq.acl.AccessValidator;
 import org.apache.rocketmq.acl.plain.PlainAccessValidator;
 import org.apache.rocketmq.broker.BrokerController;
@@ -30,7 +31,6 @@ import org.apache.rocketmq.common.protocol.body.ProducerTableInfo;
 import org.apache.rocketmq.common.protocol.header.GetAllProducerInfoRequestHeader;
 import org.apache.rocketmq.common.topic.TopicValidator;
 import org.apache.rocketmq.broker.transaction.queue.TransactionalMessageUtil;
-import org.apache.rocketmq.common.AclConfig;
 import org.apache.rocketmq.common.MQVersion;
 import org.apache.rocketmq.common.MixAll;
 import org.apache.rocketmq.common.PlainAccessConfig;
@@ -75,8 +75,6 @@ import org.apache.rocketmq.common.protocol.header.DeleteSubscriptionGroupRequest
 import org.apache.rocketmq.common.protocol.header.DeleteTopicRequestHeader;
 import org.apache.rocketmq.common.protocol.header.GetAllTopicConfigResponseHeader;
 import org.apache.rocketmq.common.protocol.header.GetBrokerAclConfigResponseHeader;
-import org.apache.rocketmq.common.protocol.header.GetBrokerClusterAclConfigResponseBody;
-import org.apache.rocketmq.common.protocol.header.GetBrokerClusterAclConfigResponseHeader;
 import org.apache.rocketmq.common.protocol.header.GetBrokerConfigResponseHeader;
 import org.apache.rocketmq.common.protocol.header.GetConsumeStatsInBrokerHeader;
 import org.apache.rocketmq.common.protocol.header.GetConsumeStatsRequestHeader;
@@ -143,8 +141,19 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final BrokerController brokerController;
 
+    protected Set<String> configBlackList = new HashSet<>();
+
     public AdminBrokerProcessor(final BrokerController brokerController) {
         this.brokerController = brokerController;
+        initConfigBlackList();
+    }
+
+    private void initConfigBlackList() {
+        configBlackList.add("brokerConfigPath");
+        configBlackList.add("rocketmqHome");
+        configBlackList.add("configBlackList");
+        String[] configArray = brokerController.getBrokerConfig().getConfigBlackList().split(";");
+        configBlackList.addAll(Arrays.asList(configArray));
     }
 
     @Override
@@ -235,8 +244,6 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor {
                 return updateGlobalWhiteAddrsConfig(ctx, request);
             case RequestCode.RESUME_CHECK_HALF_MESSAGE:
                 return resumeCheckHalfMessage(ctx, request);
-            case RequestCode.GET_BROKER_CLUSTER_ACL_CONFIG:
-                return getBrokerClusterAclConfig(ctx, request);
             default:
                 return getUnknownCmdResponse(ctx, request);
         }
@@ -459,27 +466,6 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor {
         return null;
     }
 
-    private RemotingCommand getBrokerClusterAclConfig(ChannelHandlerContext ctx, RemotingCommand request) {
-
-        final RemotingCommand response = RemotingCommand.createResponseCommand(GetBrokerClusterAclConfigResponseHeader.class);
-
-        try {
-            AccessValidator accessValidator = this.brokerController.getAccessValidatorMap().get(PlainAccessValidator.class);
-            GetBrokerClusterAclConfigResponseBody body = new GetBrokerClusterAclConfigResponseBody();
-            AclConfig aclConfig = accessValidator.getAllAclConfig();
-            body.setGlobalWhiteAddrs(aclConfig.getGlobalWhiteAddrs());
-            body.setPlainAccessConfigs(aclConfig.getPlainAccessConfigs());
-            response.setCode(ResponseCode.SUCCESS);
-            response.setBody(body.encode());
-            response.setRemark(null);
-            return response;
-        } catch (Exception e) {
-            log.error("Failed to generate a proper getBrokerClusterAclConfig response", e);
-        }
-
-        return null;
-    }
-
     private RemotingCommand getUnknownCmdResponse(ChannelHandlerContext ctx, RemotingCommand request) {
         String error = " request type " + request.getCode() + " not supported";
         final RemotingCommand response =
@@ -527,6 +513,11 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor {
                 String bodyStr = new String(body, MixAll.DEFAULT_CHARSET);
                 Properties properties = MixAll.string2Properties(bodyStr);
                 if (properties != null) {
+                    if (validateBlackListConfigExist(properties)) {
+                        response.setCode(ResponseCode.NO_PERMISSION);
+                        response.setRemark("Can not update config in black list.");
+                    }
+
                     log.info("updateBrokerConfig, new config: [{}] client: {} ", properties, ctx.channel().remoteAddress());
                     this.brokerController.getConfiguration().update(properties);
                     if (properties.containsKey("brokerPermission")) {
@@ -550,6 +541,16 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor {
         response.setCode(ResponseCode.SUCCESS);
         response.setRemark(null);
         return response;
+    }
+
+
+    private boolean validateBlackListConfigExist(Properties properties) {
+        for (String blackConfig:configBlackList) {
+            if (properties.containsKey(blackConfig)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private RemotingCommand getBrokerConfig(ChannelHandlerContext ctx, RemotingCommand request) {
