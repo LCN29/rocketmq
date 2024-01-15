@@ -1129,6 +1129,7 @@ public class BrokerController {
                 @Override
                 public void run() {
                     try {
+                        // 从主节点中同步数据到当前节点
                         BrokerController.this.slaveSynchronize.syncAll();
                     }
                     catch (Throwable e) {

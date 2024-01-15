@@ -27,6 +27,10 @@ public class RequestCode {
     public static final int QUERY_BROKER_OFFSET = 13;
     public static final int QUERY_CONSUMER_OFFSET = 14;
     public static final int UPDATE_CONSUMER_OFFSET = 15;
+
+    /**
+     * 通知 Broker 更新或者创建 topic
+     */
     public static final int UPDATE_AND_CREATE_TOPIC = 17;
     public static final int GET_ALL_TOPIC_CONFIG = 21;
     public static final int GET_TOPIC_CONFIG_LIST = 22;
@@ -86,6 +90,9 @@ public class RequestCode {
 
     public static final int DELETE_KV_CONFIG = 102;
 
+    /**
+     * 向 namesrv 注册 broker
+     */
     public static final int REGISTER_BROKER = 103;
 
     public static final int UNREGISTER_BROKER = 104;

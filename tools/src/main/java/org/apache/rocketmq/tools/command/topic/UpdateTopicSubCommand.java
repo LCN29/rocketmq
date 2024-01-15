@@ -108,7 +108,7 @@ public class UpdateTopicSubCommand implements SubCommand {
                 topicConfig.setWriteQueueNums(Integer.parseInt(commandLine.getOptionValue('w').trim()));
             }
 
-            // perm
+            // perm, 2:只写 4:只读; 6:读写
             if (commandLine.hasOption('p')) {
                 topicConfig.setPerm(Integer.parseInt(commandLine.getOptionValue('p').trim()));
             }
@@ -132,6 +132,7 @@ public class UpdateTopicSubCommand implements SubCommand {
             }
             topicConfig.setOrder(isOrder);
 
+            // broker 地址, 单独为某个 broker 创建 Topic
             if (commandLine.hasOption('b')) {
                 String addr = commandLine.getOptionValue('b').trim();
 
@@ -150,10 +151,12 @@ public class UpdateTopicSubCommand implements SubCommand {
                 return;
 
             } else if (commandLine.hasOption('c')) {
+                // cluster 名称, 为某个 broker 集群下面所有的 broker 创建 Topic
                 String clusterName = commandLine.getOptionValue('c').trim();
 
                 defaultMQAdminExt.start();
 
+                // 获取集群下面所有主节点 broker 的地址
                 Set<String> masterSet =
                     CommandUtil.fetchMasterAddrByClusterName(defaultMQAdminExt, clusterName);
                 for (String addr : masterSet) {

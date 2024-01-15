@@ -253,6 +253,7 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor {
         if (validateSlave(response)) {
             return response;
         }
+        // 请求头
         final CreateTopicRequestHeader requestHeader =
             (CreateTopicRequestHeader) request.decodeCommandCustomHeader(CreateTopicRequestHeader.class);
         log.info("updateAndCreateTopic called by {}", RemotingHelper.parseChannelRemoteAddr(ctx.channel()));
@@ -262,6 +263,8 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor {
         if (!TopicValidator.validateTopic(topic, response)) {
             return response;
         }
+
+        // 系统自定义的 Topic
         if (TopicValidator.isSystemTopic(topic, response)) {
             return response;
         }
@@ -273,8 +276,10 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor {
         topicConfig.setPerm(requestHeader.getPerm());
         topicConfig.setTopicSysFlag(requestHeader.getTopicSysFlag() == null ? 0 : requestHeader.getTopicSysFlag());
 
+        // 更新本地的 topic 配置
         this.brokerController.getTopicConfigManager().updateTopicConfig(topicConfig);
 
+        // 向所有的 NameServer 注册 topic 配置
         this.brokerController.registerIncrementBrokerData(topicConfig, this.brokerController.getTopicConfigManager().getDataVersion());
 
         response.setCode(ResponseCode.SUCCESS);

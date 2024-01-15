@@ -25,6 +25,10 @@ import java.util.Set;
 
 public class TopicValidator {
 
+    /**
+     * 允许自动创建 Topic 时, 就会自动声明这个 Topic
+     * 然后自动创建的 Topic 会根据这个 Topic 的配置来创建
+     */
     public static final String AUTO_CREATE_TOPIC_KEY_TOPIC = "TBW102"; // Will be created at broker when isAutoCreateTopicEnable
     public static final String RMQ_SYS_SCHEDULE_TOPIC = "SCHEDULE_TOPIC_XXXX";
     public static final String RMQ_SYS_BENCHMARK_TOPIC = "BenchmarkTest";

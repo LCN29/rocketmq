@@ -47,6 +47,10 @@ public class TopicConfigManager extends ConfigManager {
 
     private transient final Lock topicConfigTableLock = new ReentrantLock();
 
+    /**
+     * Topic 配置表
+     * key : Topic 名称, value: Topic 配置
+     */
     private final ConcurrentMap<String, TopicConfig> topicConfigTable =
         new ConcurrentHashMap<String, TopicConfig>(1024);
     private final DataVersion dataVersion = new DataVersion();
@@ -363,7 +367,7 @@ public class TopicConfigManager extends ConfigManager {
         }
 
         this.dataVersion.nextVersion();
-
+        // 把当前的 config 持久化到文件中, 路径 ${usr.home}/store/config/topics.json
         this.persist();
     }
 
