@@ -38,6 +38,11 @@ public class ProducerManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private static final long CHANNEL_EXPIRED_TIMEOUT = 1000 * 120;
     private static final int GET_AVAILABLE_CHANNEL_RETRY_COUNT = 3;
+
+    /**
+     * 生产者信息, 可以用于和 Producer 通讯
+     * Map<组名称, Map<通讯通道, 客户端通道信息>>
+     */
     private final ConcurrentHashMap<String /* group name */, ConcurrentHashMap<Channel, ClientChannelInfo>> groupChannelTable =
         new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Channel> clientChannelTable = new ConcurrentHashMap<>();
@@ -139,7 +144,7 @@ public class ProducerManager {
                     clientChannelInfo.toString());
         }
 
-
+        // 更新心跳时间
         if (clientChannelInfoFound != null) {
             clientChannelInfoFound.setLastUpdateTimestamp(System.currentTimeMillis());
         }

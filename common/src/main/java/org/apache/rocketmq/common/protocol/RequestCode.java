@@ -29,9 +29,13 @@ public class RequestCode {
     public static final int UPDATE_CONSUMER_OFFSET = 15;
 
     /**
-     * 通知 Broker 更新或者创建 topic
+     * 通知主 Broker 更新或者创建 topic
      */
     public static final int UPDATE_AND_CREATE_TOPIC = 17;
+
+    /**
+     * 从 Broker 请求主 Broker 获取 topic 配置
+     */
     public static final int GET_ALL_TOPIC_CONFIG = 21;
     public static final int GET_TOPIC_CONFIG_LIST = 22;
 
@@ -52,6 +56,9 @@ public class RequestCode {
 
     public static final int VIEW_MESSAGE_BY_ID = 33;
 
+    /**
+     * Producer 和 Consumer 向 Broker 发送心跳包
+     */
     public static final int HEART_BEAT = 34;
 
     public static final int UNREGISTER_CLIENT = 35;

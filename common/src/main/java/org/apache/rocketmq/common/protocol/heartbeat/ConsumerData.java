@@ -25,11 +25,33 @@ import java.util.Set;
 import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
 
 public class ConsumerData {
+
+    /**
+     * 分组
+     */
     private String groupName;
+
+    /**
+     * 消费类型，有推模式和拉模式两种
+     */
     private ConsumeType consumeType;
+
+    /**
+     * 消息类型，广播和集群消费两种
+     */
     private MessageModel messageModel;
+
+    /**
+     * 从何处开始消费
+     * 取值: 一开始偏移量 从最后偏移量 按时间戳消费
+     */
     private ConsumeFromWhere consumeFromWhere;
+
+    /**
+     * 订阅数据集合
+     */
     private Set<SubscriptionData> subscriptionDataSet = new HashSet<SubscriptionData>();
+
     private boolean unitMode;
 
     public String getGroupName() {

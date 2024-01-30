@@ -68,6 +68,21 @@ public abstract class ConfigManager {
     public abstract void decode(final String jsonString);
 
     public synchronized void persist() {
+        /**
+         * 格式:
+         * {
+         * 	 "dataVersion":{
+         * 		"counter":2,
+         * 		"timestamp":1694600053418
+         *   },
+         *   "topicConfigTable":{
+         *      "Topic 名称": {
+         *        "order": false,
+         *        "perm": 2,
+         *        ......
+         *      }
+         *  }
+         */
         String jsonString = this.encode(true);
         if (jsonString != null) {
             String fileName = this.configFilePath();

@@ -286,6 +286,7 @@ public class MQClientInstance {
             public void run() {
                 try {
                     MQClientInstance.this.cleanOfflineBroker();
+                    // 发送心跳, 维持连接, 默认 30s 发送一次
                     MQClientInstance.this.sendHeartbeatToAllBrokerWithLock();
                 } catch (Exception e) {
                     log.error("ScheduledTask sendHeartbeatToAllBroker exception", e);
@@ -537,6 +538,8 @@ public class MQClientInstance {
             return;
         }
 
+        // Producer 会提出 Broker 的 Slave 节点
+        // Consumer 会保存全部 Broker 的 Slave 和 Master 节点
         if (!this.brokerAddrTable.isEmpty()) {
             long times = this.sendHeartbeatTimesTotal.getAndIncrement();
             Iterator<Entry<String, HashMap<Long, String>>> it = this.brokerAddrTable.entrySet().iterator();
@@ -555,6 +558,7 @@ public class MQClientInstance {
                             }
 
                             try {
+                                // 响应结果为 MQ 的版本号
                                 int version = this.mQClientAPIImpl.sendHeartbeat(addr, heartbeatData, clientConfig.getMqClientApiTimeout());
                                 if (!this.brokerVersionTable.containsKey(brokerName)) {
                                     this.brokerVersionTable.put(brokerName, new HashMap<String, Integer>(4));

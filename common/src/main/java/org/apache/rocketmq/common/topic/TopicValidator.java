@@ -97,6 +97,7 @@ public class TopicValidator {
         boolean[] bitMap = VALID_CHAR_BIT_MAP;
         for (int i = 0; i < strLen; i++) {
             char ch = str.charAt(i);
+            // 非法字符校验 a-z A-Z 0-9 _ - | %
             if (ch >= len || !bitMap[ch]) {
                 return true;
             }
@@ -117,7 +118,7 @@ public class TopicValidator {
             response.setRemark("The specified topic contains illegal characters, allowing only ^[%|a-zA-Z0-9_-]+$");
             return false;
         }
-
+        // 最大长度为 127
         if (topic.length() > TOPIC_MAX_LENGTH) {
             response.setCode(ResponseCode.SYSTEM_ERROR);
             response.setRemark("The specified topic is longer than topic max length.");

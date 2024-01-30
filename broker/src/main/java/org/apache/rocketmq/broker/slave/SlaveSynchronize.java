@@ -31,6 +31,10 @@ import org.apache.rocketmq.store.config.StorePathConfigHelper;
 public class SlaveSynchronize {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final BrokerController brokerController;
+
+    /**
+     * Broker 主节点的地址
+     */
     private volatile String masterAddr = null;
 
     public SlaveSynchronize(BrokerController brokerController) {
@@ -60,12 +64,13 @@ public class SlaveSynchronize {
                     this.brokerController.getBrokerOuterAPI().getAllTopicConfig(masterAddrBak);
                 if (!this.brokerController.getTopicConfigManager().getDataVersion()
                     .equals(topicWrapper.getDataVersion())) {
-
+                    // 更新 Topic 配置信息
                     this.brokerController.getTopicConfigManager().getDataVersion()
                         .assignNewOne(topicWrapper.getDataVersion());
                     this.brokerController.getTopicConfigManager().getTopicConfigTable().clear();
                     this.brokerController.getTopicConfigManager().getTopicConfigTable()
                         .putAll(topicWrapper.getTopicConfigTable());
+                    // 从节点将 Topic 配置信息持久化到磁盘
                     this.brokerController.getTopicConfigManager().persist();
 
                     log.info("Update slave topic config from master, {}", masterAddrBak);
