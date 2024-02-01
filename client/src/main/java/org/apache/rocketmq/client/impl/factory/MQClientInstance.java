@@ -98,9 +98,17 @@ public class MQClientInstance {
     private final NettyClientConfig nettyClientConfig;
     private final MQClientAPIImpl mQClientAPIImpl;
     private final MQAdminImpl mQAdminImpl;
+
+    /**
+     * Topic 对应的路由信息
+     */
     private final ConcurrentMap<String/* Topic */, TopicRouteData> topicRouteTable = new ConcurrentHashMap<String, TopicRouteData>();
     private final Lock lockNamesrv = new ReentrantLock();
     private final Lock lockHeartbeat = new ReentrantLock();
+
+    /**
+     * Broker Name 各个实例对应的 Broker 地址
+     */
     private final ConcurrentMap<String/* Broker Name */, HashMap<Long/* brokerId */, String/* address */>> brokerAddrTable =
         new ConcurrentHashMap<String, HashMap<Long, String>>();
     private final ConcurrentMap<String/* Broker Name */, HashMap<String/* address */, Integer>> brokerVersionTable =
@@ -237,6 +245,7 @@ public class MQClientInstance {
                     // Start various schedule tasks
                     this.startScheduledTask();
                     // Start pull service
+                    // 启动一个线程, 开始拉取 MQ 消息
                     this.pullMessageService.start();
                     // Start rebalance service
                     this.rebalanceService.start();
@@ -268,6 +277,7 @@ public class MQClientInstance {
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         }
 
+        // 30s 定时任务, 更新客户端的 Topic 路由信息
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -350,6 +360,7 @@ public class MQClientInstance {
                 Entry<String, MQProducerInner> entry = it.next();
                 MQProducerInner impl = entry.getValue();
                 if (impl != null) {
+                    // 获取对应的 Producer 订阅的 Topic 列表
                     Set<String> lst = impl.getPublishTopicList();
                     topicList.addAll(lst);
                 }
@@ -357,6 +368,7 @@ public class MQClientInstance {
         }
 
         for (String topic : topicList) {
+            // 循环更新每个 Topic 的路由信息
             this.updateTopicRouteInfoFromNameServer(topic);
         }
     }
@@ -588,6 +600,7 @@ public class MQClientInstance {
         while (it.hasNext()) {
             Entry<String, MQConsumerInner> next = it.next();
             MQConsumerInner consumer = next.getValue();
+            // 消费者模式为推模式
             if (ConsumeType.CONSUME_PASSIVELY == consumer.consumeType()) {
                 Set<SubscriptionData> subscriptions = consumer.subscriptions();
                 for (SubscriptionData sub : subscriptions) {
@@ -614,6 +627,7 @@ public class MQClientInstance {
                 try {
                     TopicRouteData topicRouteData;
                     if (isDefault && defaultMQProducer != null) {
+                        // 默认的 Topic 名称 TBW102, 如何 Broker 支持自动创建 Topic, 根据这个 Topic 的配置进行 Topic 的创建
                         topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(defaultMQProducer.getCreateTopicKey(),
                             clientConfig.getMqClientApiTimeout());
                         if (topicRouteData != null) {
@@ -707,12 +721,15 @@ public class MQClientInstance {
             if (impl != null) {
                 ConsumerData consumerData = new ConsumerData();
                 consumerData.setGroupName(impl.groupName());
+                // 消费模式, 推/拉
                 consumerData.setConsumeType(impl.consumeType());
+                // 消息模式, 集群/广播
                 consumerData.setMessageModel(impl.messageModel());
+                // 从何处消费
                 consumerData.setConsumeFromWhere(impl.consumeFromWhere());
+                // 订阅信息
                 consumerData.getSubscriptionDataSet().addAll(impl.subscriptions());
                 consumerData.setUnitMode(impl.isUnitMode());
-
                 heartbeatData.getConsumerDataSet().add(consumerData);
             }
         }

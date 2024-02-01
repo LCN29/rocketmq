@@ -101,6 +101,10 @@ public class RequestCode {
     public static final int REGISTER_BROKER = 103;
 
     public static final int UNREGISTER_BROKER = 104;
+
+    /**
+     * 通过 topic 名称获取路由信息
+     */
     public static final int GET_ROUTEINFO_BY_TOPIC = 105;
 
     public static final int GET_BROKER_CLUSTER_INFO = 106;
@@ -144,6 +148,10 @@ public class RequestCode {
     public static final int GET_TOPICS_BY_CLUSTER = 224;
 
     public static final int REGISTER_FILTER_SERVER = 301;
+
+    /**
+     * 向 FilterServer 注册消息过滤类
+     */
     public static final int REGISTER_MESSAGE_FILTER_CLASS = 302;
 
     public static final int QUERY_CONSUME_TIME_SPAN = 303;

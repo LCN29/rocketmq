@@ -32,6 +32,10 @@ public class SubscriptionData implements Comparable<SubscriptionData> {
      * 常量，默认订阅所有 tag 类型消息
      */
     public final static String SUB_ALL = "*";
+
+    /**
+     * 是否启用了自定义类过滤功能
+     */
     private boolean classFilterMode = false;
 
     /**
@@ -63,6 +67,9 @@ public class SubscriptionData implements Comparable<SubscriptionData> {
      */
     private String expressionType = ExpressionType.TAG;
 
+    /**
+     * 自定义过滤类的类文件转为字符串的内容
+     */
     @JSONField(serialize = false)
     private String filterClassSource;
 
