@@ -24,6 +24,10 @@ public class ClientChannelInfo {
     private final String clientId;
     private final LanguageCode language;
     private final int version;
+
+    /**
+     * 上次心跳通知的时间
+     */
     private volatile long lastUpdateTimestamp = System.currentTimeMillis();
 
     public ClientChannelInfo(Channel channel) {

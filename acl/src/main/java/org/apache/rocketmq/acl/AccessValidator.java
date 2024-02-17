@@ -25,6 +25,9 @@ import org.apache.rocketmq.common.DataVersion;
 import org.apache.rocketmq.common.PlainAccessConfig;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
+/**
+ * RocketMQ ACL(Access Control List) validator interface.
+ */
 public interface AccessValidator {
 
     /**

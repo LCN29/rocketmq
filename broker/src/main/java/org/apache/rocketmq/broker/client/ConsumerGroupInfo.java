@@ -34,7 +34,15 @@ import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
 
 public class ConsumerGroupInfo {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
+
+    /**
+     * 组名
+     */
     private final String groupName;
+
+    /**
+     * <Topic 名称, 订阅信息>
+     */
     private final ConcurrentMap<String/* Topic */, SubscriptionData> subscriptionTable =
         new ConcurrentHashMap<String, SubscriptionData>();
     //Map<消费者对应的通讯通道, 通道对应的配置信息>

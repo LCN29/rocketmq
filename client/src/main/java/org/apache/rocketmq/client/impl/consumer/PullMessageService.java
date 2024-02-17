@@ -90,9 +90,12 @@ public class PullMessageService extends ServiceThread {
     public void run() {
         log.info(this.getServiceName() + " service started");
 
+        // 线程未被设置停止, 就会一直循环执行
         while (!this.isStopped()) {
             try {
+                // 从队列中取出拉去消息请求, 获取不到就阻塞在那里
                 PullRequest pullRequest = this.pullRequestQueue.take();
+                // 进行处理
                 this.pullMessage(pullRequest);
             } catch (InterruptedException ignored) {
             } catch (Exception e) {

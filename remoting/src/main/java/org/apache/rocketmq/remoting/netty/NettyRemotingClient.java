@@ -182,6 +182,9 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                         defaultEventExecutorGroup,
                         new NettyEncoder(),
                         new NettyDecoder(),
+                        // 心跳检测
+                        // 第三个参数: 读/写超时。在指定的时间间隔内没有读或写操作时，会触发一个 ALL_IDLE 的 IdleStateEvent 事件, 并且交给下一个 handler 处理,
+                        // 下一个 handler 必须实现 userEventTriggered 方法处理对应事件
                         new IdleStateHandler(0, 0, nettyClientConfig.getClientChannelMaxIdleTimeSeconds()),
                         new NettyConnectManageHandler(),
                         new NettyClientHandler());

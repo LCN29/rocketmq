@@ -365,7 +365,7 @@ public class TopicConfigManager extends ConfigManager {
         } else {
             log.info("create new topic [{}]", topicConfig);
         }
-
+        // 版本号
         this.dataVersion.nextVersion();
         // 把当前的 config 持久化到文件中, 路径 ${usr.home}/store/config/topics.json
         this.persist();

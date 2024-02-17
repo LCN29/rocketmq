@@ -154,6 +154,10 @@ public class BrokerController {
     private MessageStore messageStore;
     private RemotingServer remotingServer;
     private RemotingServer fastRemotingServer;
+
+    /**
+     * Topic 配置管理器
+     */
     private TopicConfigManager topicConfigManager;
     private ExecutorService sendMessageExecutor;
     private ExecutorService putMessageFutureExecutor;
@@ -539,6 +543,9 @@ public class BrokerController {
         }
     }
 
+    /**
+     * 注册 Broker 可以处理的请求编码, 和对应的处理器
+     */
     public void registerProcessor() {
         /**
          * SendMessageProcessor
@@ -1120,11 +1127,14 @@ public class BrokerController {
     }
 
     private void handleSlaveSynchronize(BrokerRole role) {
+
+        // 当前的 Broker 为从节点
         if (role == BrokerRole.SLAVE) {
             if (null != slaveSyncFuture) {
                 slaveSyncFuture.cancel(false);
             }
             this.slaveSynchronize.setMasterAddr(null);
+            // 注册一个 10s 一次的定时器，用于从主节点中同步数据到当前节点
             slaveSyncFuture = this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {

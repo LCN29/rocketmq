@@ -257,6 +257,7 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor {
     private synchronized RemotingCommand updateAndCreateTopic(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
+        // 从节点不处理
         if (validateSlave(response)) {
             return response;
         }
@@ -267,6 +268,7 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor {
 
         String topic = requestHeader.getTopic();
 
+        // 验证 Topic 名称是否合法
         if (!TopicValidator.validateTopic(topic, response)) {
             return response;
         }

@@ -21,11 +21,11 @@ broker 将自己的信息注册到 namesever, Producer/Consumer 从 namesever �
 单向发送, 只推送消息到 MQ, 不需要确认消失是否到 MQ, producer.sendOneway(msg)
 
 接受消息
-消费者主动到 Broker 拉消息 consumer.fetchSubscribeMessageQuery("Topic")
+消费者主动到 Broker **拉消息** consumer.fetchSubscribeMessageQuery("Topic")
 得到对应 tocpic 下的 MessageQueue, 死循环 MessageQueue, 获取里面的消息
-consumer.pullBlockIfNotFound(MessageQueue, subExpression, offset, maxNums) （DefaultLitePullCOnsumer 替代过期方法）
+备注: consumer.pullBlockIfNotFound(MessageQueue, subExpression, offset, maxNums) （DefaultLitePullConsumer 替代过期方法）
 
-Broker 主动推消息到消费者 (本质还是消费者拉)， consumer.registerMessageListener(new MessageListenerConcurrenly())
+Broker 主动**推消息**到消费者 (本质还是消费者拉)， consumer.registerMessageListener(new MessageListenerConcurrenly())
 
 
 
@@ -42,41 +42,44 @@ consumer.registerMessageListener(new MessageListenerQrderly())
 同一个消息，可以多个消费者进行消费 consumer.setMessageModel(broadcast)
 
 延迟消息
-msg.setDelyTimeLevel(3), 先发到系统内部自己维护的一个 schedule_topic_xxx 的队列,
+msg.setDelayTimeLevel(3), 先发到系统内部自己维护的一个 schedule_topic_xxx 的队列,
 
 批量消息
 producer.send(List<Message>) 有消息大小限制
 producer.send(ListSplitter<Message>) 内部提供的类，会自定计算大小
 
 过滤消息
-tag 的使用   
-consumer.subscribt("topic", MessageSelector.bySql("TAGS is not null and a is not null and a between 0 and 3")) 指定消息的过滤条件，同时消息里面有 a 这个属性 (msg.putUserProperty("a", "11"))  SQL92 语法
+tag 的使用   **SQL92 语法使用**
+consumer.subscribt("topic", MessageSelector.bySql("TAGS is not null and a is not null and a between 0 and 3")) 
+指定消息的过滤条件，同时消息的 tag 存在 同时消息里面有 a 这个属性, 值在 0 到 3 之间,
+(可以通过 msg.putUserProperty("a", "11") 进行设置)  
 
 事务消息
 事务消息只和生产者有关, 只保证了生产端的正常, 但是下游的消费失败等, 不受事务控制
 ```java
-TransactionMQProducer producer
-        
-// executeLocalTransaction 不需要走事务        
-// checkLocalTransaction        
-        
-// executeLocalTransaction 方法决定消息是否提交
-//  return COMMIT_MESSAGE 事务提交, ROLLBACK_MESSAGE 事务回滚       
-// return UNKNOW 走到 checkLocalTransaction 再次判断        
-producer.setTransactionListener(new TransacationListner())
-producer.setMessageInTransaction
+// 事务发送者
+TransactionMQProducer producer = new TransactionMQProducer("group");
+
+// 设置回调监听器 内部 2 个方法
+// executeLocalTransaction 告诉 Broker 是否执行事务， commit/rollback/unknown      
+// checkLocalTransaction   检查本地事务是否执行成功      
+producer.setTransactionListener(new TransactionListener());
+
+// 发送消息
+producer.sendMessageInTrasnaction(msg, null);
 ```
 
 流程
 1. 生产者发送消息，这个消息会变为 half 消息 (这个消息这时下游不可见, 放到了一个 RMQ_SYS_TRANS_HALF_TOPIC 的 Topic 中)
 2. Broker 回复 half 消息,
-3. 生产者直行自己的本地事务(也就是自己的逻辑，比如入库什么的)
-4. 返回自己本地事务的处理状态(commit, rollback, unknown)
+3. 生产者执行自己的本地事务 (也就是自己的逻辑，比如入库什么的), 对应方法 executeLocalTransaction
+4. 返回自己本地事务的处理状态(commit, rollback, unknown - 可能回查时，本地事务还为执行完，先返回 unknown)
    4.1 commit, 将消息发送给下游服务
    4.3 rollback, 丢弃消息
-   4.4 unknown, 过一段时间回查生产者的本地事务的状态 (checkLocalTransaction)
+   4.4 unknown, 过一段时间再回查生产者的本地事务的状态 (checkLocalTransaction)
    4.5 生产者可以去检查自己本地事务的执行情况, 在向 Broker 返回一个 commit/rollback/unknown
    4.6 如果还是 unknown, 继续回查本地的事务, 最多尝试 15 次, 最终进行丢弃
+
 
 demo
 下单 -> 支付 -> 下游
@@ -88,15 +91,13 @@ demo
 简单粗暴，
 同步发送 + 多次重试，也可以实现事务
 
-acl
-Topic 权限配置
+acl: Topic 权限配置
 
-Broker 主从，主挂了, 从无法升级为主，所以非高可用的
-
-4.5.0 以后的真高可用方式 Dledger
-接管 Broker 的 Commit Log 消息存储
-从集群中选举 Master 节点
-完成 master 节点往 slave 节点的消息同步
+权限控制（ACL）主要为RocketMQ提供Topic资源级别的用户访问控制。用户在
+使用RocketMQ权限控制时，可以在Client客户端通过 RPCHook注入AccessKey和
+SecretKey签名；同时，将对应的权限控制属性（包括Topic访问权限、IP白名单和
+AccessKey和SecretKey签名等）设置在$ROCKETMQ_HOME/conf/plain_acl.yml
+的配置文件中。Broker端对AccessKey所拥有的权限进行校验，校验不过，抛出异常。
 
 
 消息存储
@@ -113,7 +114,7 @@ mmap 将文件读取到内核态缓冲区, 用户缓冲区是跟内核缓冲区�
 这样就减少了一次从内核态读取数据到用户态的 IO， mmap 减少了一次拷贝
 (缺点, 文件不能太大, 只能映射 1.5- 2G, 所以 RocketMQ 单个 commit log 1g)
 
-sendfile 去除了用户态,  offset 和 length
+sendfile 去除了用户态,  引入了 offset 和 length
 将文件的 offset、length 等数据拷贝到内核态，这些数据在内核态
 传递给另一方 (Socket), Socket 通过这些数据读取文件
 这样避免了文件在在各种态直接的拷贝

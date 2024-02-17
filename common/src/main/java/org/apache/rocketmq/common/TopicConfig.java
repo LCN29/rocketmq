@@ -32,7 +32,11 @@ public class TopicConfig {
 
     // topic 名称
     private String topicName;
+
+    // 读队列的数量
     private int readQueueNums = defaultReadQueueNums;
+
+    // 写队列的数量
     private int writeQueueNums = defaultWriteQueueNums;
 
     // 权限
@@ -41,8 +45,10 @@ public class TopicConfig {
     // topic 的过滤类型, 单 tag 过滤还是多 tag 过滤
     private TopicFilterType topicFilterType = TopicFilterType.SINGLE_TAG;
 
+    // 暂时未知作用
     private int topicSysFlag = 0;
 
+    // 是否为顺序 Topic
     private boolean order = false;
 
     public TopicConfig() {

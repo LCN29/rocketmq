@@ -89,6 +89,10 @@ public class UpdateTopicSubCommand implements SubCommand {
     @Override
     public void execute(final CommandLine commandLine, final Options options,
         RPCHook rpcHook) throws SubCommandException {
+
+        // 创建 Topic 的命令 ./mqadmin updateTopic -n 192.168.77.129:9876 -c DefaultCluster -t TestTopic
+        // -n nameServer 地址
+
         DefaultMQAdminExt defaultMQAdminExt = new DefaultMQAdminExt(rpcHook);
         defaultMQAdminExt.setInstanceName(Long.toString(System.currentTimeMillis()));
 
@@ -98,26 +102,29 @@ public class UpdateTopicSubCommand implements SubCommand {
             topicConfig.setWriteQueueNums(8);
             topicConfig.setTopicName(commandLine.getOptionValue('t').trim());
 
-            // readQueueNums
+            // readQueueNums 可以通过参数 -r 指定
             if (commandLine.hasOption('r')) {
                 topicConfig.setReadQueueNums(Integer.parseInt(commandLine.getOptionValue('r').trim()));
             }
 
-            // writeQueueNums
+            // writeQueueNums 可以通过参数 -w 指定
             if (commandLine.hasOption('w')) {
                 topicConfig.setWriteQueueNums(Integer.parseInt(commandLine.getOptionValue('w').trim()));
             }
 
-            // perm, 2:只写 4:只读; 6:读写
+            // perm, 2:只写 4:只读; 6:读写, 可以通过参数 -p 指定
             if (commandLine.hasOption('p')) {
                 topicConfig.setPerm(Integer.parseInt(commandLine.getOptionValue('p').trim()));
             }
 
+            // 是否为单元化, 可以通过参数 -u 指定
+            // 暂时不清楚作用
             boolean isUnit = false;
             if (commandLine.hasOption('u')) {
                 isUnit = Boolean.parseBoolean(commandLine.getOptionValue('u').trim());
             }
 
+            // hasUnitSub, 作用未知
             boolean isCenterSync = false;
             if (commandLine.hasOption('s')) {
                 isCenterSync = Boolean.parseBoolean(commandLine.getOptionValue('s').trim());
@@ -126,6 +133,7 @@ public class UpdateTopicSubCommand implements SubCommand {
             int topicCenterSync = TopicSysFlag.buildSysFlag(isUnit, isCenterSync);
             topicConfig.setTopicSysFlag(topicCenterSync);
 
+            // 是否为顺序 Topic , 可以通过参数 -o 指定
             boolean isOrder = false;
             if (commandLine.hasOption('o')) {
                 isOrder = Boolean.parseBoolean(commandLine.getOptionValue('o').trim());
@@ -137,11 +145,15 @@ public class UpdateTopicSubCommand implements SubCommand {
                 String addr = commandLine.getOptionValue('b').trim();
 
                 defaultMQAdminExt.start();
+                // 创建 Topic
                 defaultMQAdminExt.createAndUpdateTopicConfig(addr, topicConfig);
 
                 if (isOrder) {
+                    // 获取到 broker 的名称
                     String brokerName = CommandUtil.fetchBrokerNameByAddr(defaultMQAdminExt, addr);
+                    // broker 名称:写队列的数量
                     String orderConf = brokerName + ":" + topicConfig.getWriteQueueNums();
+                    // 进行顺序队列配置
                     defaultMQAdminExt.createOrUpdateOrderConf(topicConfig.getTopicName(), orderConf, false);
                     System.out.printf("%s", String.format("set broker orderConf. isOrder=%s, orderConf=[%s]",
                         isOrder, orderConf.toString()));
@@ -151,7 +163,8 @@ public class UpdateTopicSubCommand implements SubCommand {
                 return;
 
             } else if (commandLine.hasOption('c')) {
-                // cluster 名称, 为某个 broker 集群下面所有的 broker 创建 Topic
+
+                // cluster 名称, 为某个集群下面所有的 主节点 broker 创建 Topic
                 String clusterName = commandLine.getOptionValue('c').trim();
 
                 defaultMQAdminExt.start();
@@ -160,11 +173,14 @@ public class UpdateTopicSubCommand implements SubCommand {
                 Set<String> masterSet =
                     CommandUtil.fetchMasterAddrByClusterName(defaultMQAdminExt, clusterName);
                 for (String addr : masterSet) {
+                    // 创建操作
                     defaultMQAdminExt.createAndUpdateTopicConfig(addr, topicConfig);
                     System.out.printf("create topic to %s success.%n", addr);
                 }
 
+                // 进行顺序队列配置
                 if (isOrder) {
+                    // 获取集群下面所有 broker 节点的名称
                     Set<String> brokerNameSet =
                         CommandUtil.fetchBrokerNameByClusterName(defaultMQAdminExt, clusterName);
                     StringBuilder orderConf = new StringBuilder();

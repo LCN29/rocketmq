@@ -20,7 +20,9 @@ package org.apache.rocketmq.common.protocol;
 public class RequestCode {
 
     public static final int SEND_MESSAGE = 10;
-
+    /**
+     * Consumer 从 Broker 拉取消息
+     */
     public static final int PULL_MESSAGE = 11;
 
     public static final int QUERY_MESSAGE = 12;
@@ -29,9 +31,13 @@ public class RequestCode {
     public static final int UPDATE_CONSUMER_OFFSET = 15;
 
     /**
-     * 通知 Broker 更新或者创建 topic
+     * 通知主 Broker 更新或者创建 topic
      */
     public static final int UPDATE_AND_CREATE_TOPIC = 17;
+
+    /**
+     * 从 Broker 请求主 Broker 获取 topic 配置
+     */
     public static final int GET_ALL_TOPIC_CONFIG = 21;
     public static final int GET_TOPIC_CONFIG_LIST = 22;
 
@@ -52,6 +58,9 @@ public class RequestCode {
 
     public static final int VIEW_MESSAGE_BY_ID = 33;
 
+    /**
+     * Producer 和 Consumer 向 Broker 发送心跳包
+     */
     public static final int HEART_BEAT = 34;
 
     public static final int UNREGISTER_CLIENT = 35;
@@ -59,6 +68,11 @@ public class RequestCode {
     public static final int CONSUMER_SEND_MSG_BACK = 36;
 
     public static final int END_TRANSACTION = 37;
+
+    /**
+     * 通过 group 名称获取消费者列表
+     * 新增消费者/移除消费者 等情况, Consumer 重新平衡, 会向随机的一个 Broker 获取对应的消费者信息
+     */
     public static final int GET_CONSUMER_LIST_BY_GROUP = 38;
 
     public static final int CHECK_TRANSACTION_STATE = 39;
@@ -99,6 +113,10 @@ public class RequestCode {
     public static final int REGISTER_BROKER = 103;
 
     public static final int UNREGISTER_BROKER = 104;
+
+    /**
+     * 通过 topic 名称获取路由信息
+     */
     public static final int GET_ROUTEINFO_BY_TOPIC = 105;
 
     public static final int GET_BROKER_CLUSTER_INFO = 106;
@@ -142,6 +160,10 @@ public class RequestCode {
     public static final int GET_TOPICS_BY_CLUSTER = 224;
 
     public static final int REGISTER_FILTER_SERVER = 301;
+
+    /**
+     * 向 FilterServer 注册消息过滤类
+     */
     public static final int REGISTER_MESSAGE_FILTER_CLASS = 302;
 
     public static final int QUERY_CONSUME_TIME_SPAN = 303;

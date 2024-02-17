@@ -27,15 +27,49 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class SubscriptionData implements Comparable<SubscriptionData> {
+
+    /**
+     * 常量，默认订阅所有 tag 类型消息
+     */
     public final static String SUB_ALL = "*";
+
+    /**
+     * 是否启用了自定义类过滤功能
+     */
     private boolean classFilterMode = false;
+
+    /**
+     * consumer.subscribe("topic", "TagA || TagB");
+     *
+     * Topic 主题
+     */
     private String topic;
+
+    /**
+     * 订阅表达式，例如 "TagA || TagB"
+     */
     private String subString;
+
+    /**
+     * 订阅的 tag 集合, 上面的 subString 切割后的结果
+     */
     private Set<String> tagsSet = new HashSet<String>();
+
+    /**
+     * 订阅的 tag 的 HashCode 集合
+     */
     private Set<Integer> codeSet = new HashSet<Integer>();
+
     private long subVersion = System.currentTimeMillis();
+
+    /**
+     * 订阅表达式类型，有 TAG 模式和 SQL92 模式, 自定义的过滤类时， 这个好像就直接是 TAG
+     */
     private String expressionType = ExpressionType.TAG;
 
+    /**
+     * 自定义过滤类的类文件转为字符串的内容
+     */
     @JSONField(serialize = false)
     private String filterClassSource;
 
