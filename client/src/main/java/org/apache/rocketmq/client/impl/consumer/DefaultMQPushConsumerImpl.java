@@ -891,7 +891,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         try {
             // 封装订阅的对象
             SubscriptionData subscriptionData = FilterAPI.buildSubscriptionData(topic, subExpression);
-            // 本地保存一份订阅信息
+            // 消费者在本地自己保存一份订阅信息
             this.rebalanceImpl.getSubscriptionInner().put(topic, subscriptionData);
             if (this.mQClientFactory != null) {
                 // 发送心跳给所有的 broker, 心跳里面包含订阅信息

@@ -543,6 +543,9 @@ public class BrokerController {
         }
     }
 
+    /**
+     * 注册 Broker 可以处理的请求编码, 和对应的处理器
+     */
     public void registerProcessor() {
         /**
          * SendMessageProcessor

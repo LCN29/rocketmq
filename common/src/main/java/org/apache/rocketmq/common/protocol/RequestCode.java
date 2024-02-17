@@ -20,7 +20,9 @@ package org.apache.rocketmq.common.protocol;
 public class RequestCode {
 
     public static final int SEND_MESSAGE = 10;
-
+    /**
+     * Consumer 从 Broker 拉取消息
+     */
     public static final int PULL_MESSAGE = 11;
 
     public static final int QUERY_MESSAGE = 12;
@@ -66,6 +68,11 @@ public class RequestCode {
     public static final int CONSUMER_SEND_MSG_BACK = 36;
 
     public static final int END_TRANSACTION = 37;
+
+    /**
+     * 通过 group 名称获取消费者列表
+     * 新增消费者/移除消费者 等情况, Consumer 重新平衡, 会向随机的一个 Broker 获取对应的消费者信息
+     */
     public static final int GET_CONSUMER_LIST_BY_GROUP = 38;
 
     public static final int CHECK_TRANSACTION_STATE = 39;

@@ -41,13 +41,30 @@ import org.apache.rocketmq.common.protocol.heartbeat.ConsumeType;
 import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
 import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
 
+/**
+ * 再平衡
+ * 处理消费者变更
+ * 处理主题订阅变更
+ * 处理消息队列变更
+ * 处理消费进度
+ */
 public abstract class RebalanceImpl {
+
     protected static final InternalLogger log = ClientLogger.getLog();
+
     protected final ConcurrentMap<MessageQueue, ProcessQueue> processQueueTable = new ConcurrentHashMap<MessageQueue, ProcessQueue>(64);
+    // Map<订阅的 Topic 名称, 消息队列集合>
     protected final ConcurrentMap<String/* topic */, Set<MessageQueue>> topicSubscribeInfoTable =
         new ConcurrentHashMap<String, Set<MessageQueue>>();
+
+    /**
+     * Map<订阅的 Topic 名称, 具体的订阅消息>
+     * 消费者保存自己的订阅消息
+     * 订阅消息包含, 过滤模式 Tag, SQL, 过滤条件的 tag 集合, tag hashcode 集合等
+     */
     protected final ConcurrentMap<String /* topic */, SubscriptionData> subscriptionInner =
         new ConcurrentHashMap<String, SubscriptionData>();
+
     protected String consumerGroup;
     protected MessageModel messageModel;
     protected AllocateMessageQueueStrategy allocateMessageQueueStrategy;

@@ -63,7 +63,7 @@ public class SubscriptionData implements Comparable<SubscriptionData> {
     private long subVersion = System.currentTimeMillis();
 
     /**
-     * 订阅表达式类型，有 tag 模式和 sql 模式
+     * 订阅表达式类型，有 TAG 模式和 SQL92 模式, 自定义的过滤类时， 这个好像就直接是 TAG
      */
     private String expressionType = ExpressionType.TAG;
 
