@@ -147,6 +147,7 @@ public class BrokerConfig {
     private long filterDataCleanTimeSpan = 24 * 3600 * 1000;
 
     // whether do filter when retry.
+    // 消息重试时, 是否支持按照条件进行过滤
     private boolean filterSupportRetry = false;
     private boolean enablePropertyFilter = false;
 

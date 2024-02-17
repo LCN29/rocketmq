@@ -63,6 +63,11 @@ public class RequestCode {
 
     public static final int CHECK_TRANSACTION_STATE = 39;
 
+    /**
+     * Broker 通知 Consumer Ids 变化
+     * 新的消费者加入消费者组
+     * 现有的消费者从消费者组中退出
+     */
     public static final int NOTIFY_CONSUMER_IDS_CHANGED = 40;
 
     public static final int LOCK_BATCH_MQ = 41;

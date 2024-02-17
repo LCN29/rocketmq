@@ -122,6 +122,7 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor {
 
         final boolean hasSuspendFlag = PullSysFlag.hasSuspendFlag(requestHeader.getSysFlag());
         final boolean hasCommitOffsetFlag = PullSysFlag.hasCommitOffsetFlag(requestHeader.getSysFlag());
+        // 从请求头中获取是否有订阅信息 (特殊情况) 还是从 Broker 自身维护的信息中获取订阅信息
         final boolean hasSubscriptionFlag = PullSysFlag.hasSubscriptionFlag(requestHeader.getSysFlag());
 
         final long suspendTimeoutMillisLong = hasSuspendFlag ? requestHeader.getSuspendTimeoutMillis() : 0;
@@ -153,6 +154,7 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor {
         ConsumerFilterData consumerFilterData = null;
         if (hasSubscriptionFlag) {
             try {
+                // 从请求头中获取订阅信息 特殊情况
                 subscriptionData = FilterAPI.build(
                     requestHeader.getTopic(), requestHeader.getSubscription(), requestHeader.getExpressionType()
                 );
@@ -227,6 +229,7 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor {
             return response;
         }
 
+        // 创建消息过滤器
         MessageFilter messageFilter;
         if (this.brokerController.getBrokerConfig().isFilterSupportRetry()) {
             messageFilter = new ExpressionForRetryMessageFilter(subscriptionData, consumerFilterData,
