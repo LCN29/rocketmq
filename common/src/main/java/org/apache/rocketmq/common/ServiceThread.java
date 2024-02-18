@@ -121,21 +121,28 @@ public abstract class ServiceThread implements Runnable {
     }
 
     public void wakeup() {
+        // 将通知标识从 false 设置为 true 成功, 那么业务线程在休眠中
+        // 设置失败, 说明业务线程在执行中
         if (hasNotified.compareAndSet(false, true)) {
+            // 设置成功, 唤醒业务线程
             waitPoint.countDown(); // notify
         }
     }
 
     protected void waitForRunning(long interval) {
+        // 将通知标识从 true 设置为 false 成功, 那么当前线程进行休眠
+        // 设置失败, 表明有其他线程进行了唤醒, 需要执行任务
         if (hasNotified.compareAndSet(true, false)) {
             this.onWaitEnd();
             return;
         }
 
-        //entry to wait
+        // entry to wait
+        // 重置 CountDownLatch2 的初始值
         waitPoint.reset();
 
         try {
+            // 待超时时间的等待唤醒
             waitPoint.await(interval, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             log.error("Interrupted", e);

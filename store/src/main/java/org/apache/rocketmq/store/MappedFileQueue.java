@@ -168,7 +168,8 @@ public class MappedFileQueue {
 
             try {
                 MappedFile mappedFile = new MappedFile(file.getPath(), mappedFileSize);
-
+                // 这里先直接将所有指针设置为文件大小
+                // 后面在 org.apache.rocketmq.store.CommitLog.recoverNormally 中进行文件完整判断, 然后进行修改为正确的值
                 mappedFile.setWrotePosition(this.mappedFileSize);
                 mappedFile.setFlushedPosition(this.mappedFileSize);
                 mappedFile.setCommittedPosition(this.mappedFileSize);
@@ -438,13 +439,16 @@ public class MappedFileQueue {
 
     public boolean flush(final int flushLeastPages) {
         boolean result = true;
+        // 根据当前的刷盘位置获取对应的 MappedFile
         MappedFile mappedFile = this.findMappedFileByOffset(this.flushedWhere, this.flushedWhere == 0);
         if (mappedFile != null) {
             long tmpTimeStamp = mappedFile.getStoreTimestamp();
+            // 刷盘, 返回最新刷盘后的刷盘位置
             int offset = mappedFile.flush(flushLeastPages);
             long where = mappedFile.getFileFromOffset() + offset;
             result = where == this.flushedWhere;
             this.flushedWhere = where;
+            // 更新最新的消息存储时间为 MappedFile 文件中最新消息的存储时间
             if (0 == flushLeastPages) {
                 this.storeTimestamp = tmpTimeStamp;
             }
@@ -455,9 +459,12 @@ public class MappedFileQueue {
 
     public boolean commit(final int commitLeastPages) {
         boolean result = true;
+        // 通过当前的已提交的偏差获取对应的 MappedFile
         MappedFile mappedFile = this.findMappedFileByOffset(this.committedWhere, this.committedWhere == 0);
         if (mappedFile != null) {
+            // 提交到 FileChannel
             int offset = mappedFile.commit(commitLeastPages);
+            // 提交到偏差 + 已经刷盘的偏移得到一个已提交的位置
             long where = mappedFile.getFileFromOffset() + offset;
             result = where == this.committedWhere;
             this.committedWhere = where;

@@ -236,7 +236,9 @@ public class MappedFile extends ReferenceResource {
         ensureDirOK(this.file.getParent());
 
         try {
+            // 文件通道
             this.fileChannel = new RandomAccessFile(this.file, "rw").getChannel();
+            // 文件通道对应的 字节缓冲
             this.mappedByteBuffer = this.fileChannel.map(MapMode.READ_WRITE, 0, fileSize);
             TOTAL_MAPPED_VIRTUAL_MEMORY.addAndGet(fileSize);
             TOTAL_MAPPED_FILES.incrementAndGet();
@@ -280,9 +282,9 @@ public class MappedFile extends ReferenceResource {
             PutMessageContext putMessageContext) {
         assert messageExt != null;
         assert cb != null;
-
+        // 当前文件写入的指针
         int currentPos = this.wrotePosition.get();
-
+        // 写入的指针位置还没达到文件的大小
         if (currentPos < this.fileSize) {
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
             byteBuffer.position(currentPos);
@@ -351,11 +353,13 @@ public class MappedFile extends ReferenceResource {
     }
 
     /**
+     * @param flushLeastPages 刷新的页数, 会按照 OS_PAGE_SIZE 为一页进行分配处理, 为 0 就正常的偏移量进行处理
      * @return The current flushed position
      */
     public int flush(final int flushLeastPages) {
         if (this.isAbleToFlush(flushLeastPages)) {
             if (this.hold()) {
+                // 获取最新的位置, 写位置或者提交位置, 由是否开启了 nio 虚拟内存决定
                 int value = getReadPosition();
 
                 try {
@@ -368,7 +372,7 @@ public class MappedFile extends ReferenceResource {
                 } catch (Throwable e) {
                     log.error("Error occurred when force data to disk.", e);
                 }
-
+                // 更新最新的刷盘位置
                 this.flushedPosition.set(value);
                 this.release();
             } else {
@@ -385,6 +389,9 @@ public class MappedFile extends ReferenceResource {
             return this.wrotePosition.get();
         }
         if (this.isAbleToCommit(commitLeastPages)) {
+            // 是否可以提交
+            // 如果 commitLeastPages 大于 0, 会计算写指标到提交指标直接的偏差 除以 每页的大小, 得到当前的偏差满足的页数, 如果没达到对应的页数, 就返回 false
+            // 小于等于 0, 那么只要写偏差大于提交偏差就返回 true
             if (this.hold()) {
                 commit0();
                 this.release();
@@ -408,6 +415,7 @@ public class MappedFile extends ReferenceResource {
 
         if (writePos - lastCommittedPosition > 0) {
             try {
+                // 写入到文件通道
                 ByteBuffer byteBuffer = writeBuffer.slice();
                 byteBuffer.position(lastCommittedPosition);
                 byteBuffer.limit(writePos);

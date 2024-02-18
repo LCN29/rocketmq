@@ -92,7 +92,7 @@ public class DefaultMessageStore implements MessageStore {
     private final ConcurrentMap<String/* topic */, ConcurrentMap<Integer/* queueId */, ConsumeQueue>> consumeQueueTable;
 
     /**
-     * 刷盘服务线程
+     * ConsumeQueue 刷盘服务线程
      */
     private final FlushConsumeQueueService flushConsumeQueueService;
 

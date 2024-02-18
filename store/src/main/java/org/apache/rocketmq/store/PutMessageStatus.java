@@ -22,7 +22,12 @@ public enum PutMessageStatus {
      * 可以进行存储
      */
     PUT_OK,
+
+    /**
+     * 刷盘超时
+     */
     FLUSH_DISK_TIMEOUT,
+
     FLUSH_SLAVE_TIMEOUT,
     SLAVE_NOT_AVAILABLE,
     /**

@@ -40,7 +40,7 @@ public class MessageStoreConfig {
 
     private String readOnlyCommitLogStorePaths = null;
 
-    // CommitLog file size,default is 1G
+    // CommitLog file size, default is 1G
     private int mappedFileSizeCommitLog = 1024 * 1024 * 1024;
     // ConsumeQueue file size,default is 30W
     private int mappedFileSizeConsumeQueue = 300000 * ConsumeQueue.CQ_STORE_UNIT_SIZE;
@@ -52,13 +52,20 @@ public class MessageStoreConfig {
     // this will be set by pipe of calculate filter bit map.
     private int bitMapLengthConsumeQueueExt = 64;
 
-    // CommitLog flush interval
-    // flush data to disk
+    /**
+     * CommitLog flush interval
+     * flush data to disk
+     * 刷新数据到磁盘的间隔
+     */
     @ImportantField
     private int flushIntervalCommitLog = 500;
 
-    // Only used if TransientStorePool enabled
-    // flush data to FileChannel
+    /**
+     * Only used if TransientStorePool enabled
+     * flush data to FileChannel
+     * 刷新数据到 FileChannel 的间隔
+     * 开启了 TransientStorePool 才有作用
+     */
     @ImportantField
     private int commitIntervalCommitLog = 200;
 
@@ -67,7 +74,10 @@ public class MessageStoreConfig {
      */
     private boolean useReentrantLockWhenPutMessage = true;
 
-    // Whether schedule flush
+    /**
+     * Whether schedule flush
+     * 是否定时刷盘
+     */
     @ImportantField
     private boolean flushCommitLogTimed = true;
     // ConsumeQueue flush interval
@@ -92,7 +102,6 @@ public class MessageStoreConfig {
 
     /**
      * The maximum size of message body,default is 4M,4M only for body length,not include others.
-     *
      * MQ body 的最大大小, 只包含消息体, 不包含其他, 默认值为 4M
      */
     private int maxMessageSize = 1024 * 1024 * 4;
@@ -100,15 +109,32 @@ public class MessageStoreConfig {
     // This ensures no on-the-wire or on-disk corruption to the messages occurred.
     // This check adds some overhead,so it may be disabled in cases seeking extreme performance.
     private boolean checkCRCOnRecover = true;
-    // How many pages are to be flushed when flush CommitLog
+    /**
+     * How many pages are to be flushed when flush CommitLog
+     * 一次刷盘可以刷几页
+     */
     private int flushCommitLogLeastPages = 4;
-    // How many pages are to be committed when commit data to file
+
+    /**
+     * How many pages are to be committed when commit data to file
+     * 每次提交数据到 FileChannel 的页数, 开启了 TransientStorePool 使用
+     */
     private int commitCommitLogLeastPages = 4;
+
     // Flush page size when the disk in warming state
     private int flushLeastPagesWhenWarmMapedFile = 1024 / 4 * 16;
     // How many pages are to be flushed when flush ConsumeQueue
     private int flushConsumeQueueLeastPages = 2;
+
+    /**
+     * 2 次刷盘的时间间隔
+     */
     private int flushCommitLogThoroughInterval = 1000 * 10;
+
+    /**
+     * 2 次提交数据到 FileChannel 的时间间隔, 开启了 TransientStorePool 使用
+     * 2 次提交的时间超过了这个时间, 就立即将所有的页数据都提交, 否则按照配置的每次多少页提交
+     */
     private int commitCommitLogThoroughInterval = 200;
     private int flushConsumeQueueThoroughInterval = 1000 * 60;
     @ImportantField

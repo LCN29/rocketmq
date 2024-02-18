@@ -22,21 +22,56 @@ import java.util.function.Supplier;
  * When write a message to the commit log, returns results
  */
 public class AppendMessageResult {
-    // Return code
+    /**
+     * Return code
+     * 写入内存结果状态码
+     */
     private AppendMessageStatus status;
-    // Where to start writing
+
+    /**
+     * Where to start writing
+     * commitLog 下次写入消息的开始位置 (这里存储的是, 当前消息未写入到 ByteBuffer 时的位置)
+     */
     private long wroteOffset;
-    // Write Bytes
+
+    /**
+     * Write Bytes
+     * 本次消息写入的大小
+     */
     private int wroteBytes;
-    // Message ID
+
+    /**
+     * Message ID
+     * 消息 Id, 实际是是 Broker 的 IP + 端口, 通过下面的 msgIdSupplier 获取
+     */
     private String msgId;
+
+    /**
+     * Message ID Supplier
+     * 可以获取到消息 ID 的 Supplier
+     */
     private Supplier<String> msgIdSupplier;
-    // Message storage timestamp
+
+    /**
+     * Message storage timestamp
+     * 消息存储的时间戳
+     */
     private long storeTimestamp;
-    // Consume queue's offset(step by one)
+
+    /**
+     * Consume queue's offset(step by one)
+     * 写入到 consumerqueue 的偏移量
+     */
     private long logicsOffset;
+
+    /**
+     * 将消息写入到 consumerqueue 的耗时时间
+     */
     private long pagecacheRT = 0;
 
+    /**
+     * 消息数量
+     */
     private int msgNum = 1;
 
     public AppendMessageResult(AppendMessageStatus status) {
