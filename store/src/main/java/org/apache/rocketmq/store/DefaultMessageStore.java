@@ -72,20 +72,43 @@ import org.apache.rocketmq.store.schedule.ScheduleMessageService;
 import org.apache.rocketmq.store.stats.BrokerStatsManager;
 
 public class DefaultMessageStore implements MessageStore {
+
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
+    /**
+     * 消息存储配置
+     * 存储路径, 刷盘方式等
+     */
     private final MessageStoreConfig messageStoreConfig;
-    // CommitLog
+
+    /**
+     * CommitLog 处理核心类
+     */
     private final CommitLog commitLog;
 
+    /**
+     * Map<Topic 名称, Map<队列编号, 消费队列信息>>
+     */
     private final ConcurrentMap<String/* topic */, ConcurrentMap<Integer/* queueId */, ConsumeQueue>> consumeQueueTable;
 
+    /**
+     * 刷盘服务线程
+     */
     private final FlushConsumeQueueService flushConsumeQueueService;
 
+    /**
+     * CommitLog 过期文件清除逻辑类型
+     */
     private final CleanCommitLogService cleanCommitLogService;
 
+    /**
+     * 消费队列 过期文件清除逻辑类型
+     */
     private final CleanConsumeQueueService cleanConsumeQueueService;
 
+    /**
+     * 索引服务
+     */
     private final IndexService indexService;
 
     private final AllocateMappedFileService allocateMappedFileService;
@@ -374,7 +397,7 @@ public class DefaultMessageStore implements MessageStore {
             log.warn("putMessage message topic length too long " + msg.getTopic().length());
             return PutMessageStatus.MESSAGE_ILLEGAL;
         }
-
+        // 消息的自定义属性值的字符串长度大于 32767
         if (msg.getPropertiesString() != null && msg.getPropertiesString().length() > Short.MAX_VALUE) {
             log.warn("putMessage message properties length too long " + msg.getPropertiesString().length());
             return PutMessageStatus.MESSAGE_ILLEGAL;
@@ -397,11 +420,12 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     private PutMessageStatus checkStoreStatus() {
+        // 服务管理
         if (this.shutdown) {
             log.warn("message store has shutdown, so putMessage is forbidden");
             return PutMessageStatus.SERVICE_NOT_AVAILABLE;
         }
-
+        // 从节点, 无法通过这个步骤进行保存消息
         if (BrokerRole.SLAVE == this.messageStoreConfig.getBrokerRole()) {
             long value = this.printTimes.getAndIncrement();
             if ((value % 50000) == 0) {
@@ -409,7 +433,7 @@ public class DefaultMessageStore implements MessageStore {
             }
             return PutMessageStatus.SERVICE_NOT_AVAILABLE;
         }
-
+        // 当前磁盘不可写了 (有异常或者磁盘满了)
         if (!this.runningFlags.isWriteable()) {
             long value = this.printTimes.getAndIncrement();
             if ((value % 50000) == 0) {
@@ -418,9 +442,10 @@ public class DefaultMessageStore implements MessageStore {
             }
             return PutMessageStatus.SERVICE_NOT_AVAILABLE;
         } else {
+            // 重置为 0, 这个主要是为了上面不可写时, 打印日志的频率控制
             this.printTimes.set(0);
         }
-
+        // 操作系统页写入是否繁忙
         if (this.isOSPageCacheBusy()) {
             return PutMessageStatus.OS_PAGECACHE_BUSY;
         }
@@ -428,6 +453,9 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     private PutMessageStatus checkLmqMessage(MessageExtBrokerInner msg) {
+        // 多队列分发功能检测
+        // Lmq: Light Message Queue 微消息队列
+        // Broker 配置了开启, 可以在消息的属性中设置 INNER_MULTI_DISPATCH, 指定消费队列, 最大值 20000
         if (msg.getProperties() != null
             && StringUtils.isNotBlank(msg.getProperty(MessageConst.PROPERTY_INNER_MULTI_DISPATCH))
             && this.isLmqConsumeQueueNumExceeded()) {
@@ -446,33 +474,41 @@ public class DefaultMessageStore implements MessageStore {
 
     @Override
     public CompletableFuture<PutMessageResult> asyncPutMessage(MessageExtBrokerInner msg) {
+
+        // 检查当前的存储状态
         PutMessageStatus checkStoreStatus = this.checkStoreStatus();
         if (checkStoreStatus != PutMessageStatus.PUT_OK) {
             return CompletableFuture.completedFuture(new PutMessageResult(checkStoreStatus, null));
         }
 
+        // MQ 消息本身的合法性检查
         PutMessageStatus msgCheckStatus = this.checkMessage(msg);
         if (msgCheckStatus == PutMessageStatus.MESSAGE_ILLEGAL) {
             return CompletableFuture.completedFuture(new PutMessageResult(msgCheckStatus, null));
         }
 
+        // 多队列分发功能检测合法性检查
         PutMessageStatus lmqMsgCheckStatus = this.checkLmqMessage(msg);
         if (msgCheckStatus == PutMessageStatus.LMQ_CONSUME_QUEUE_NUM_EXCEEDED) {
             return CompletableFuture.completedFuture(new PutMessageResult(lmqMsgCheckStatus, null));
         }
 
-
+        // 当前时间
         long beginTime = this.getSystemClock().now();
+        // 异步存储消息
         CompletableFuture<PutMessageResult> putResultFuture = this.commitLog.asyncPutMessage(msg);
 
         putResultFuture.thenAccept(result -> {
+            // 计算耗时时间
             long elapsedTime = this.getSystemClock().now() - beginTime;
             if (elapsedTime > 500) {
                 log.warn("putMessage not in lock elapsed time(ms)={}, bodyLength={}", elapsedTime, msg.getBody().length);
             }
+            // 存储耗时时间的情况
             this.storeStatsService.setPutMessageEntireTimeMax(elapsedTime);
 
             if (null == result || !result.isOk()) {
+                // 存储失败次数 + 1
                 this.storeStatsService.getPutMessageFailedTimes().add(1);
             }
         });
@@ -521,9 +557,11 @@ public class DefaultMessageStore implements MessageStore {
 
     private PutMessageResult waitForPutResult(CompletableFuture<PutMessageResult> putMessageResultFuture) {
         try {
+            // 获取存储消息的结果等待超时时间
             int putMessageTimeout =
                     Math.max(this.messageStoreConfig.getSyncFlushTimeout(),
                             this.messageStoreConfig.getSlaveTimeout()) + 5000;
+            // 获取处理结果
             return putMessageResultFuture.get(putMessageTimeout, TimeUnit.MILLISECONDS);
         } catch (ExecutionException | InterruptedException e) {
             return new PutMessageResult(PutMessageStatus.UNKNOWN_ERROR, null);
@@ -537,9 +575,11 @@ public class DefaultMessageStore implements MessageStore {
 
     @Override
     public boolean isOSPageCacheBusy() {
+        // 上一次存储的时间
         long begin = this.getCommitLog().getBeginTimeInLock();
+        // 当前时间 - 上一次存储的事件
         long diff = this.systemClock.now() - begin;
-
+        // 1000 < diff < 10000000
         return diff < 10000000
             && diff > this.messageStoreConfig.getOsPageCacheBusyTimeOutMills();
     }

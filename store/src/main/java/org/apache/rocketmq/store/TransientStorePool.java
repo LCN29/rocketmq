@@ -31,9 +31,24 @@ import sun.nio.ch.DirectBuffer;
 public class TransientStorePool {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
+    /**
+     * 池的大小有多少, 默认 5
+     */
     private final int poolSize;
+
+    /**
+     * 每个 commitLog 文件大小，默认 1G
+     */
     private final int fileSize;
+
+    /**
+     * 双端队列, 存储声明的 ByteBuffer
+     */
     private final Deque<ByteBuffer> availableBuffers;
+
+    /**
+     * 存储配置
+     */
     private final MessageStoreConfig storeConfig;
 
     public TransientStorePool(final MessageStoreConfig storeConfig) {
@@ -50,6 +65,13 @@ public class TransientStorePool {
         for (int i = 0; i < poolSize; i++) {
             ByteBuffer byteBuffer = ByteBuffer.allocateDirect(fileSize);
 
+            // Java NIO 的内存映射机制，提供了将文件系统中的文件映射到内存机制，实现对文件的操作转换对内存地址的操作，极大的提高了 IO 特性，
+            // 但这部分内存并不是常驻内存，可以被置换到交换内存(虚拟内存)，RocketMQ 为了提高消息发送的性能，引入了内存锁定机制，
+            // 即将最近需要操作的 CommitLog 文件映射到内存，并提供内存锁定功能，确保这些文件始终存在内存中
+
+            // 交换内存是一种虚拟内存的管理方式，它使得操作系统可以将一部分硬盘空间模拟成内存使用,
+            // 这种方式可以在物理内存不足以满足当前程序运行需求时，通过将一些不常用或即将被使用的内存数据移动到交换内存中，
+            // 从而释放出更多的物理内存空间，以供其他正在运行的程序使用
             final long address = ((DirectBuffer) byteBuffer).address();
             Pointer pointer = new Pointer(address);
             LibC.INSTANCE.mlock(pointer, new NativeLong(fileSize));

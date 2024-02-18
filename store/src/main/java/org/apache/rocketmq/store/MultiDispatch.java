@@ -44,6 +44,7 @@ public class MultiDispatch {
     }
 
     public boolean isMultiDispatchMsg(MessageExtBrokerInner msg) {
+        // 默认 false --> !false == true --> return false --> 调用方 !false == true
         if (!messageStore.getMessageStoreConfig().isEnableMultiDispatch()) {
             return false;
         }

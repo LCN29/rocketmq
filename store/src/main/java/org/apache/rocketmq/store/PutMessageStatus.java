@@ -17,15 +17,41 @@
 package org.apache.rocketmq.store;
 
 public enum PutMessageStatus {
+
+    /**
+     * 可以进行存储
+     */
     PUT_OK,
     FLUSH_DISK_TIMEOUT,
     FLUSH_SLAVE_TIMEOUT,
     SLAVE_NOT_AVAILABLE,
+    /**
+     * 服务不可用
+     */
     SERVICE_NOT_AVAILABLE,
+
+    /**
+     * 创建 MappedFile (也就是 CommitLog) 文件失败
+     */
     CREATE_MAPEDFILE_FAILED,
+
+    /**
+     * MQ 消息本身有异常, topic 名称太长或者属性值太多
+     */
     MESSAGE_ILLEGAL,
     PROPERTIES_SIZE_EXCEEDED,
+    /**
+     * 操作系统页写入繁忙
+     */
     OS_PAGECACHE_BUSY,
+
+    /**
+     * 未知异常
+     */
     UNKNOWN_ERROR,
+
+    /**
+     * 多队列分发功能检测, 参数校验失败
+     */
     LMQ_CONSUME_QUEUE_NUM_EXCEEDED,
 }

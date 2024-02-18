@@ -69,6 +69,10 @@ public class StoreStatsService extends ServiceThread {
     private volatile LongAdder[] putMessageDistributeTime;
     private volatile LongAdder[] lastPutMessageDistributeTime;
     private long messageStoreBootTimestamp = System.currentTimeMillis();
+
+    /**
+     * 每次存储消息中最大的耗时时间
+     */
     private volatile long putMessageEntireTimeMax = 0;
     private volatile long getMessageEntireTimeMax = 0;
     // for putMessageEntireTimeMax
@@ -160,6 +164,7 @@ public class StoreStatsService extends ServiceThread {
     }
 
     public void setPutMessageEntireTimeMax(long value) {
+        // 维护了一个 Map, key: 超时时间, value: 这个超时时间出现的次数
         this.incPutMessageEntireTime(value);
         final LongAdder[] times = this.putMessageDistributeTime;
 

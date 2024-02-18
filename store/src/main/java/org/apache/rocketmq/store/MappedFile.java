@@ -44,27 +44,92 @@ import org.apache.rocketmq.store.util.LibC;
 import sun.nio.ch.DirectBuffer;
 
 public class MappedFile extends ReferenceResource {
-    public static final int OS_PAGE_SIZE = 1024 * 4;
+
     protected static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
 
+    /**
+     * 操作系统页大小 4K
+     */
+    public static final int OS_PAGE_SIZE = 1024 * 4;
+
+    /**
+     * 所有 MappedFile 实例已使用字节总数
+     */
     private static final AtomicLong TOTAL_MAPPED_VIRTUAL_MEMORY = new AtomicLong(0);
 
+    /**
+     * 所有 MappedFile 个数
+     */
     private static final AtomicInteger TOTAL_MAPPED_FILES = new AtomicInteger(0);
+
+    /**
+     * 当前 MappedFile 对象当前写指针
+     */
     protected final AtomicInteger wrotePosition = new AtomicInteger(0);
+
+    /**
+     * 当前 MappedFile 对象提交的指针
+     */
     protected final AtomicInteger committedPosition = new AtomicInteger(0);
+
+    /**
+     * 当前 MappedFile 对象刷写到磁盘的指针
+     */
     private final AtomicInteger flushedPosition = new AtomicInteger(0);
+
+    /**
+     * 文件总大小
+     */
     protected int fileSize;
+
+    /**
+     * 文件通道
+     */
     protected FileChannel fileChannel;
     /**
-     * Message will put to here first, and then reput to FileChannel if writeBuffer is not null.
+     * Message will put to here first, and then rePut to FileChannel if writeBuffer is not null.
+     *
+     * 开启了 transientStorePoolEnable, 消息会写入堆外内存，然后提交到 PageCache 并最终刷写到磁盘
+     * 主要是利用率 NIO 的内存映射机制
      */
     protected ByteBuffer writeBuffer = null;
+
+    /**
+     * ByteBuffer 缓冲池
+     * 一个 ByteBuffer 就是一个 CommitLog 文件
+     *
+     * 开启了 transientStorePoolEnable, 这个对象才有值, 将最近的 5 个 CommitLog 加载到内存中
+     */
     protected TransientStorePool transientStorePool = null;
+
+    /**
+     * 文件名称
+     */
     private String fileName;
+
+    /**
+     * 文件序号, 代表该文件的文件偏移量
+     */
     private long fileFromOffset;
+
+    /**
+     * 文件对象
+     */
     private File file;
+
+    /**
+     * 对应操作系统的 PageCache
+     */
     private MappedByteBuffer mappedByteBuffer;
+
+    /**
+     * 最后一次存储时间戳
+     */
     private volatile long storeTimestamp = 0;
+
+    /**
+     * 文件第一次创建
+     */
     private boolean firstCreateInQueue = false;
 
     public MappedFile() {
@@ -163,9 +228,11 @@ public class MappedFile extends ReferenceResource {
         this.fileName = fileName;
         this.fileSize = fileSize;
         this.file = new File(fileName);
+        // commitLog 的文件名就是当前文件开始的消息偏移量
         this.fileFromOffset = Long.parseLong(this.file.getName());
         boolean ok = false;
 
+        // 确保文件目录没有问题
         ensureDirOK(this.file.getParent());
 
         try {

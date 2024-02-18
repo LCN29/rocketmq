@@ -75,6 +75,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
         if (!this.hasSendMessageHook()) {
             return null;
         }
+        // 通过 Topic 获取命名空间, 主要是针对重试队列和死信队列特殊处理
         String namespace = NamespaceUtil.getNamespaceFromResource(requestHeader.getTopic());
         SendMessageContext mqtraceContext = new SendMessageContext();
         mqtraceContext.setProducerGroup(requestHeader.getProducerGroup());
@@ -88,6 +89,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
 
         Map<String, String> properties = MessageDecoder.string2messageProperties(requestHeader.getProperties());
         String uniqueKey = properties.get(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX);
+        // 追加多 2 个属性 MSG_REGION 和 TRACE_ON
         properties.put(MessageConst.PROPERTY_MSG_REGION, this.brokerController.getBrokerConfig().getRegionId());
         properties.put(MessageConst.PROPERTY_TRACE_SWITCH, String.valueOf(this.brokerController.getBrokerConfig().isTraceOn()));
         requestHeader.setProperties(MessageDecoder.messageProperties2String(properties));
@@ -95,6 +97,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
         if (uniqueKey == null) {
             uniqueKey = "";
         }
+        // 设置唯一 key, 可以通过属性的 UNIQ_KEY 进行设置
         mqtraceContext.setMsgUniqueKey(uniqueKey);
         return mqtraceContext;
     }
@@ -178,7 +181,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
         if (TopicValidator.isNotAllowedSendTopic(requestHeader.getTopic(), response)) {
             return response;
         }
-
+        // Topic 配置
         TopicConfig topicConfig =
             this.brokerController.getTopicConfigManager().selectTopicConfig(requestHeader.getTopic());
         if (null == topicConfig) {
@@ -214,7 +217,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
                 return response;
             }
         }
-
+        // 发送的 MQ 队列编号
         int queueIdInt = requestHeader.getQueueId();
         int idValid = Math.max(topicConfig.getWriteQueueNums(), topicConfig.getReadQueueNums());
         if (queueIdInt >= idValid) {

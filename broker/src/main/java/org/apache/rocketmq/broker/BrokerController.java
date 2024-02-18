@@ -151,6 +151,11 @@ public class BrokerController {
     private final BrokerFastFailure brokerFastFailure;
     private final Configuration configuration;
     private final Map<Class, AccessValidator> accessValidatorMap = new HashMap<Class, AccessValidator>();
+
+    /**
+     * 消息存储对象
+     * 包含了各个消息文件, commitLog, consumerQueue 等的处理
+     */
     private MessageStore messageStore;
     private RemotingServer remotingServer;
     private RemotingServer fastRemotingServer;
@@ -160,6 +165,9 @@ public class BrokerController {
      */
     private TopicConfigManager topicConfigManager;
     private ExecutorService sendMessageExecutor;
+    /**
+     * 用户处理生产者/消费者发送消息处理完成后, 执行对应的回调函数
+     */
     private ExecutorService putMessageFutureExecutor;
     private ExecutorService pullMessageExecutor;
     private ExecutorService replyMessageExecutor;
@@ -268,7 +276,7 @@ public class BrokerController {
                 log.error("Failed to initialize", e);
             }
         }
-
+        // 从磁盘中加载已有的消息文件
         result = result && this.messageStore.load();
 
         if (result) {
@@ -965,7 +973,7 @@ public class BrokerController {
             this.brokerConfig.getRegisterBrokerTimeoutMills(),
             this.brokerConfig.isCompressedRegister());
 
-        if (registerBrokerResultList.size() > 0) {
+        if (!registerBrokerResultList.isEmpty()) {
             RegisterBrokerResult registerBrokerResult = registerBrokerResultList.get(0);
             if (registerBrokerResult != null) {
                 if (this.updateMasterHAServerAddrPeriodically && registerBrokerResult.getHaServerAddr() != null) {

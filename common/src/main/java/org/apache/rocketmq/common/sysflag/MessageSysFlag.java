@@ -32,6 +32,9 @@ public class MessageSysFlag {
      *
      */
     public final static int COMPRESSED_FLAG = 0x1;
+    /**
+     * 多 Tag 过滤标识
+     */
     public final static int MULTI_TAGS_FLAG = 0x1 << 1;
     public final static int TRANSACTION_NOT_TYPE = 0;
     public final static int TRANSACTION_PREPARED_TYPE = 0x1 << 2;

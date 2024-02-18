@@ -26,6 +26,9 @@ public class RunningFlags {
 
     private static final int WRITE_INDEX_FILE_ERROR_BIT = 1 << 3;
 
+    /**
+     * 磁盘满了 (默认是达到 90%)
+     */
     private static final int DISK_FULL_BIT = 1 << 4;
 
     private volatile int flagBits = 0;

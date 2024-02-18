@@ -91,8 +91,12 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor {
         final SendMessageContext mqtraceContext;
         switch (request.getCode()) {
             case RequestCode.CONSUMER_SEND_MSG_BACK:
+                // 消费者发送消息处理
                 return this.asyncConsumerSendMsgBack(ctx, request);
             default:
+                // 生产者发送消息处理
+
+                // 获取请求头
                 SendMessageRequestHeader requestHeader = parseRequestHeader(request);
                 if (requestHeader == null) {
                     return CompletableFuture.completedFuture(null);
@@ -699,7 +703,7 @@ public class SendMessageProcessor extends AbstractSendMessageProcessor {
         response.addExtField(MessageConst.PROPERTY_TRACE_SWITCH, String.valueOf(this.brokerController.getBrokerConfig().isTraceOn()));
 
         log.debug("Receive SendMessage request command {}", request);
-
+        // 设置一个时间戳, 只有到了这个时间才开始接受消息
         final long startTimestamp = this.brokerController.getBrokerConfig().getStartAcceptSendRequestTimeStamp();
 
         if (this.brokerController.getMessageStore().now() < startTimestamp) {

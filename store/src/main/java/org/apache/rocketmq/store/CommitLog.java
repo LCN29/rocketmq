@@ -60,21 +60,49 @@ public class CommitLog {
     protected static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     // End of file empty MAGIC CODE cbd43194
     protected final static int BLANK_MAGIC_CODE = -875286124;
+
+    /**
+     * MappedFile 队列
+     * 一个 MappedFile 可以看作是一个 CommitLog 文件
+     */
     protected final MappedFileQueue mappedFileQueue;
+
     protected final DefaultMessageStore defaultMessageStore;
+
+    /**
+     * 刷盘业务类, 同步和异步刷盘
+     */
     private final FlushCommitLogService flushCommitLogService;
 
-    //If TransientStorePool enabled, we must flush message to FileChannel at fixed periods
+    /**
+     * If TransientStorePool enabled, we must flush message to FileChannel at fixed periods
+     * 刷盘业务类, 异步刷盘中的一种特殊处理模式
+     */
     private final FlushCommitLogService commitLogService;
 
+    /**
+     * 将 MQ 消息写入到 MappedFile 的 ByteBuffer 后的回调函数
+     */
     private final AppendMessageCallback appendMessageCallback;
+
+    /**
+     * ThreadLocal 对象
+     */
     private final ThreadLocal<PutMessageThreadLocal> putMessageThreadLocal;
+
+    /**
+     * Map<Topic名称-队列序号, 对应的偏移量>
+     */
     protected HashMap<String/* topic-queueid */, Long/* offset */> topicQueueTable = new HashMap<String, Long>(1024);
+
     protected Map<String/* topic-queueid */, Long/* offset */> lmqTopicQueueTable = new ConcurrentHashMap<>(1024);
     protected volatile long confirmOffset = -1L;
 
     private volatile long beginTimeInLock = 0;
 
+    /**
+     * 消息写入文件锁
+     */
     protected final PutMessageLock putMessageLock;
 
     private volatile Set<String> fullStorePaths = Collections.emptySet();
@@ -615,28 +643,36 @@ public class CommitLog {
     }
 
     public CompletableFuture<PutMessageResult> asyncPutMessage(final MessageExtBrokerInner msg) {
+
         // Set the storage time
+        // 设置存储的时间戳
         msg.setStoreTimestamp(System.currentTimeMillis());
-        // Set the message body BODY CRC (consider the most appropriate setting
-        // on the client)
+        // Set the message body BODY CRC (consider the most appropriate setting on the client)
+        // 设置 crc 值
         msg.setBodyCRC(UtilAll.crc32(msg.getBody()));
         // Back to Results
         AppendMessageResult result = null;
 
+        // 存储结构统计线程
         StoreStatsService storeStatsService = this.defaultMessageStore.getStoreStatsService();
 
         String topic = msg.getTopic();
-//        int queueId msg.getQueueId();
+        // int queueId msg.getQueueId();
+        // 消息类型
         final int tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());
+        // 非事务消息 或 事务提交消息
         if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE
                 || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
             // Delay Delivery
+            // 延迟投递
             if (msg.getDelayTimeLevel() > 0) {
+                // 修正最大延迟级别
                 if (msg.getDelayTimeLevel() > this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel()) {
                     msg.setDelayTimeLevel(this.defaultMessageStore.getScheduleMessageService().getMaxDelayLevel());
                 }
-
+                // 修改 Topic 为 SCHEDULE_TOPIC_XXXX
                 topic = TopicValidator.RMQ_SYS_SCHEDULE_TOPIC;
+                // 根据延迟级别计算出对应的队列
                 int queueId = ScheduleMessageService.delayLevel2QueueId(msg.getDelayTimeLevel());
 
                 // Backup real topic, queueId
@@ -649,6 +685,7 @@ public class CommitLog {
             }
         }
 
+        // 发送消息的主机地址或者当前存储消息的 Broker 地址使用了 IPV6，设置相应的 IPV6 标识
         InetSocketAddress bornSocketAddress = (InetSocketAddress) msg.getBornHost();
         if (bornSocketAddress.getAddress() instanceof Inet6Address) {
             msg.setBornHostV6Flag();
@@ -659,22 +696,28 @@ public class CommitLog {
             msg.setStoreHostAddressV6Flag();
         }
 
+        // 从 ThreadLocal 中获取对应的 PutMessageThreadLocal 对象
         PutMessageThreadLocal putMessageThreadLocal = this.putMessageThreadLocal.get();
+        // 动态调整消息的大小
         updateMaxMessageSize(putMessageThreadLocal);
+        // 没有开启多队列分发功能
         if (!multiDispatch.isMultiDispatchMsg(msg)) {
+            // 把 msg 中的内容写入到获取到的 MessageExtEncoder 的 byteBuf 中, 然后返回 null
             PutMessageResult encodeResult = putMessageThreadLocal.getEncoder().encode(msg);
             if (encodeResult != null) {
                 return CompletableFuture.completedFuture(encodeResult);
             }
             msg.setEncodedBuff(putMessageThreadLocal.getEncoder().getEncoderBuffer());
         }
+        // key ==> Topic-对应的消息队列序号
         PutMessageContext putMessageContext = new PutMessageContext(generateKey(putMessageThreadLocal.getKeyBuilder(), msg));
 
         long elapsedTimeInLock = 0;
         MappedFile unlockMappedFile = null;
-
+        // 可重入锁
         putMessageLock.lock(); //spin or ReentrantLock ,depending on store config
         try {
+            // 获取最新的 MappedFile 对象
             MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile();
             long beginLockTimestamp = this.defaultMessageStore.getSystemClock().now();
             this.beginTimeInLock = beginLockTimestamp;
@@ -683,6 +726,7 @@ public class CommitLog {
             // global
             msg.setStoreTimestamp(beginLockTimestamp);
 
+            // 获取不到或者文件已经满了, 重新创建一个
             if (null == mappedFile || mappedFile.isFull()) {
                 mappedFile = this.mappedFileQueue.getLastMappedFile(0); // Mark: NewFile may be cause noise
             }
@@ -690,7 +734,7 @@ public class CommitLog {
                 log.error("create mapped file1 error, topic: " + msg.getTopic() + " clientAddr: " + msg.getBornHostString());
                 return CompletableFuture.completedFuture(new PutMessageResult(PutMessageStatus.CREATE_MAPEDFILE_FAILED, null));
             }
-
+            // DefaultAppendMessageCallback 实现类, 内部包含写入后的回调
             result = mappedFile.appendMessage(msg, this.appendMessageCallback, putMessageContext);
             switch (result.getStatus()) {
                 case PUT_OK:
@@ -735,12 +779,16 @@ public class CommitLog {
         storeStatsService.getSinglePutMessageTopicTimesTotal(msg.getTopic()).add(1);
         storeStatsService.getSinglePutMessageTopicSizeTotal(topic).add(result.getWroteBytes());
 
+        // 刷盘
         CompletableFuture<PutMessageStatus> flushResultFuture = submitFlushRequest(result, msg);
+        // 主从同步
         CompletableFuture<PutMessageStatus> replicaResultFuture = submitReplicaRequest(result, msg);
         return flushResultFuture.thenCombine(replicaResultFuture, (flushStatus, replicaStatus) -> {
+            // 设置刷盘结果
             if (flushStatus != PutMessageStatus.PUT_OK) {
                 putMessageResult.setPutMessageStatus(flushStatus);
             }
+            // 设置主从同步结果
             if (replicaStatus != PutMessageStatus.PUT_OK) {
                 putMessageResult.setPutMessageStatus(replicaStatus);
             }
@@ -860,8 +908,8 @@ public class CommitLog {
     }
 
     public CompletableFuture<PutMessageStatus> submitFlushRequest(AppendMessageResult result, MessageExt messageExt) {
-        // Synchronization flush
         if (FlushDiskType.SYNC_FLUSH == this.defaultMessageStore.getMessageStoreConfig().getFlushDiskType()) {
+            // 同步刷盘
             final GroupCommitService service = (GroupCommitService) this.flushCommitLogService;
             if (messageExt.isWaitStoreMsgOK()) {
                 GroupCommitRequest request = new GroupCommitRequest(result.getWroteOffset() + result.getWroteBytes(),
@@ -873,12 +921,13 @@ public class CommitLog {
                 service.wakeup();
                 return CompletableFuture.completedFuture(PutMessageStatus.PUT_OK);
             }
-        }
-        // Asynchronous flush
-        else {
+        } else {
+            // 异步刷盘
             if (!this.defaultMessageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
+                // FlushRealTimeService
                 flushCommitLogService.wakeup();
             } else  {
+                // CommitRealTimeService
                 commitLogService.wakeup();
             }
             return CompletableFuture.completedFuture(PutMessageStatus.PUT_OK);
@@ -1167,34 +1216,6 @@ public class CommitLog {
         }
     }
 
-    public static class GroupCommitRequest {
-        private final long nextOffset;
-        private CompletableFuture<PutMessageStatus> flushOKFuture = new CompletableFuture<>();
-        private final long deadLine;
-
-        public GroupCommitRequest(long nextOffset, long timeoutMillis) {
-            this.nextOffset = nextOffset;
-            this.deadLine = System.nanoTime() + (timeoutMillis * 1_000_000);
-        }
-
-        public long getDeadLine() {
-            return deadLine;
-        }
-
-        public long getNextOffset() {
-            return nextOffset;
-        }
-
-        public void wakeupCustomer(final PutMessageStatus putMessageStatus) {
-            this.flushOKFuture.complete(putMessageStatus);
-        }
-
-        public CompletableFuture<PutMessageStatus> future() {
-            return flushOKFuture;
-        }
-
-    }
-
     /**
      * GroupCommit Service
      */
@@ -1294,6 +1315,34 @@ public class CommitLog {
         public long getJointime() {
             return 1000 * 60 * 5;
         }
+    }
+
+    public static class GroupCommitRequest {
+        private final long nextOffset;
+        private CompletableFuture<PutMessageStatus> flushOKFuture = new CompletableFuture<>();
+        private final long deadLine;
+
+        public GroupCommitRequest(long nextOffset, long timeoutMillis) {
+            this.nextOffset = nextOffset;
+            this.deadLine = System.nanoTime() + (timeoutMillis * 1_000_000);
+        }
+
+        public long getDeadLine() {
+            return deadLine;
+        }
+
+        public long getNextOffset() {
+            return nextOffset;
+        }
+
+        public void wakeupCustomer(final PutMessageStatus putMessageStatus) {
+            this.flushOKFuture.complete(putMessageStatus);
+        }
+
+        public CompletableFuture<PutMessageStatus> future() {
+            return flushOKFuture;
+        }
+
     }
 
     class DefaultAppendMessageCallback implements AppendMessageCallback {

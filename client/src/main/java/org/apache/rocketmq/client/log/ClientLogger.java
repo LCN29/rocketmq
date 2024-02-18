@@ -16,6 +16,7 @@
  */
 package org.apache.rocketmq.client.log;
 
+import org.apache.rocketmq.common.MixAll;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InnerLoggerFactory;
 import org.apache.rocketmq.logging.InternalLogger;
@@ -62,7 +63,8 @@ public class ClientLogger {
     }
 
     private static synchronized Appender createClientAppender() {
-        String clientLogRoot = System.getProperty(CLIENT_LOG_ROOT, System.getProperty("user.home") + "/logs/rocketmqlogs");
+        // 日志的目录从 System.getProperty("user.home") 修改为 MixAll.ROCKET_MQ_HOME
+        String clientLogRoot = System.getProperty(CLIENT_LOG_ROOT, MixAll.ROCKET_MQ_HOME + "/logs/rocketmqlogs");
         String clientLogMaxIndex = System.getProperty(CLIENT_LOG_MAXINDEX, "10");
         String clientLogFileName = System.getProperty(CLIENT_LOG_FILENAME, "rocketmq_client.log");
         String maxFileSize = System.getProperty(CLIENT_LOG_FILESIZE, "1073741824");

@@ -129,6 +129,10 @@ public class BrokerConfig {
 
     private long startAcceptSendRequestTimeStamp = 0L;
 
+    /**
+     * 消息轨迹跟踪功能
+     * 和 traceTopicEnable 搭配使用
+     */
     private boolean traceOn = true;
 
     // Switch of filter bit map calculation.

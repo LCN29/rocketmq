@@ -18,6 +18,7 @@ package org.apache.rocketmq.store.config;
 
 import java.io.File;
 
+import org.apache.rocketmq.common.MixAll;
 import org.apache.rocketmq.common.annotation.ImportantField;
 import org.apache.rocketmq.store.ConsumeQueue;
 
@@ -26,8 +27,9 @@ public class MessageStoreConfig {
     public static final String MULTI_PATH_SPLITTER = System.getProperty("rocketmq.broker.multiPathSplitter", ",");
 
     //The root directory in which the log data is kept
+    // 存储目录从 System.getProperty("user.home") 修改为 System.getProperty(ROCKETMQ_HOME)
     @ImportantField
-    private String storePathRootDir = System.getProperty("user.home") + File.separator + "store";
+    private String storePathRootDir = MixAll.ROCKET_MQ_HOME + File.separator + "store";
 
     //The directory in which the commitlog is kept
     @ImportantField
@@ -87,7 +89,12 @@ public class MessageStoreConfig {
     private int fileReservedTime = 72;
     // Flow control for ConsumeQueue
     private int putMsgIndexHightWater = 600000;
-    // The maximum size of message body,default is 4M,4M only for body length,not include others.
+
+    /**
+     * The maximum size of message body,default is 4M,4M only for body length,not include others.
+     *
+     * MQ body 的最大大小, 只包含消息体, 不包含其他, 默认值为 4M
+     */
     private int maxMessageSize = 1024 * 1024 * 4;
     // Whether check the CRC32 of the records consumed.
     // This ensures no on-the-wire or on-disk corruption to the messages occurred.
