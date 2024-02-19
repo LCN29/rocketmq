@@ -78,10 +78,10 @@ public class MQFaultStrategy {
                 if (writeQueueNums > 0) {
                     final MessageQueue mq = tpInfo.selectOneMessageQueue();
                     if (notBestBroker != null) {
-                        mq.setBrokerName(notBestBroker);
-                        mq.setQueueId(tpInfo.getSendWhichQueue().incrementAndGet() % writeQueueNums);
+                        return new MessageQueue(mq.getTopic(), notBestBroker, tpInfo.getSendWhichQueue().incrementAndGet() % writeQueueNums);
+                    } else {
+                        return mq;
                     }
-                    return mq;
                 } else {
                     latencyFaultTolerance.remove(notBestBroker);
                 }
