@@ -39,6 +39,10 @@ public class ClientConfig {
     private String clientIP = RemotingUtil.getLocalAddress();
     private String instanceName = System.getProperty("rocketmq.client.name", "DEFAULT");
     private int clientCallbackExecutorThreads = Runtime.getRuntime().availableProcessors();
+
+    /**
+     * 命名空间, 可以用来进行逻辑隔离
+     */
     protected String namespace;
     private boolean namespaceInitialized = false;
     protected AccessChannel accessChannel = AccessChannel.LOCAL;
@@ -55,6 +59,9 @@ public class ClientConfig {
      * Offset persistent interval for consumer
      */
     private int persistConsumerOffsetInterval = 1000 * 5;
+    /**
+     * 拉取消息异常后延迟多久再重试
+     */
     private long pullTimeDelayMillsWhenException = 1000;
     private boolean unitMode = false;
     private String unitName;

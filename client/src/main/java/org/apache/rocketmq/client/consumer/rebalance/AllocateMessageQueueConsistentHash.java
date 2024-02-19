@@ -26,6 +26,8 @@ import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
  * Consistent Hashing queue algorithm
+ *
+ * 一致性哈希负载均衡算法
  */
 public class AllocateMessageQueueConsistentHash extends AbstractAllocateMessageQueueStrategy {
 

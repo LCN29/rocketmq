@@ -18,6 +18,7 @@
 package org.apache.rocketmq.client.consumer.rebalance;
 
 import java.util.List;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.client.consumer.AllocateMessageQueueStrategy;
@@ -29,8 +30,18 @@ public abstract class AbstractAllocateMessageQueueStrategy implements AllocateMe
 
     private final InternalLogger log = ClientLogger.getLog();
 
-    public boolean check(String consumerGroup, String currentCID, List<MessageQueue> mqAll,
-        List<String> cidAll) {
+    /**
+     * 消费者 id 检查
+     *
+     * @param consumerGroup 消费者组名
+     * @param currentCID    客户端 id
+     * @param mqAll         所有的 MQ 队列
+     * @param cidAll        所有的客户端 id
+     * @return
+     */
+    public boolean check(String consumerGroup, String currentCID, List<MessageQueue> mqAll, List<String> cidAll) {
+
+
         if (StringUtils.isEmpty(currentCID)) {
             throw new IllegalArgumentException("currentCID is empty");
         }
@@ -40,12 +51,12 @@ public abstract class AbstractAllocateMessageQueueStrategy implements AllocateMe
         if (CollectionUtils.isEmpty(cidAll)) {
             throw new IllegalArgumentException("cidAll is null or cidAll empty");
         }
-
+        // 不包含就返回 false
         if (!cidAll.contains(currentCID)) {
             log.info("[BUG] ConsumerGroup: {} The consumerId: {} not in cidAll: {}",
-                consumerGroup,
-                currentCID,
-                cidAll);
+                    consumerGroup,
+                    currentCID,
+                    cidAll);
             return false;
         }
 

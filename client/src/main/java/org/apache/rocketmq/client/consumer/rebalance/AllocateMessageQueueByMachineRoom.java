@@ -19,17 +19,20 @@ package org.apache.rocketmq.client.consumer.rebalance;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+
 import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
  * Computer room Hashing queue algorithm, such as Alipay logic room
+ * <p>
+ * 最近机房策略
  */
 public class AllocateMessageQueueByMachineRoom extends AbstractAllocateMessageQueueStrategy {
     private Set<String> consumeridcs;
 
     @Override
     public List<MessageQueue> allocate(String consumerGroup, String currentCID, List<MessageQueue> mqAll,
-        List<String> cidAll) {
+                                       List<String> cidAll) {
 
         List<MessageQueue> result = new ArrayList<MessageQueue>();
         if (!check(consumerGroup, currentCID, mqAll, cidAll)) {

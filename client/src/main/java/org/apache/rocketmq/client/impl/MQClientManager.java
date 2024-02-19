@@ -45,6 +45,7 @@ public class MQClientManager {
     }
 
     public MQClientInstance getOrCreateMQClientInstance(final ClientConfig clientConfig, RPCHook rpcHook) {
+        // 机器的IP@配置的实例名称 InstanceName
         String clientId = clientConfig.buildMQClientId();
         MQClientInstance instance = this.factoryTable.get(clientId);
         if (null == instance) {

@@ -53,6 +53,7 @@ public abstract class RebalanceImpl {
     protected static final InternalLogger log = ClientLogger.getLog();
 
     protected final ConcurrentMap<MessageQueue, ProcessQueue> processQueueTable = new ConcurrentHashMap<MessageQueue, ProcessQueue>(64);
+
     // Map<订阅的 Topic 名称, 消息队列集合>
     protected final ConcurrentMap<String/* topic */, Set<MessageQueue>> topicSubscribeInfoTable =
         new ConcurrentHashMap<String, Set<MessageQueue>>();

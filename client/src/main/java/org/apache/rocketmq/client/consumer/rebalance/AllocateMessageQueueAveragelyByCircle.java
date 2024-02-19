@@ -18,16 +18,26 @@ package org.apache.rocketmq.client.consumer.rebalance;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
  * Cycle average Hashing queue algorithm
+ * <p>
+ * 环形平均分配算法
+ * 将所有的消费者按照圆环排列起来, 将队列每次一个分配给圆环的消费者, 分配完圆环转向下一个, 指定队列分配完
+ * <p>
+ * 假设队列大小是 8 (编号0-7), 消费者数量 3（编号0-2）
+ * 分配结果
+ * 消费者0：队列 0，3，6；
+ * 消费者1：队列 1，4，7；
+ * 消费者2：队列 2，5
  */
 public class AllocateMessageQueueAveragelyByCircle extends AbstractAllocateMessageQueueStrategy {
 
     @Override
     public List<MessageQueue> allocate(String consumerGroup, String currentCID, List<MessageQueue> mqAll,
-        List<String> cidAll) {
+                                       List<String> cidAll) {
 
         List<MessageQueue> result = new ArrayList<MessageQueue>();
         if (!check(consumerGroup, currentCID, mqAll, cidAll)) {
