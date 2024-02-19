@@ -104,7 +104,7 @@ public class MQClientInstance {
     private final MQAdminImpl mQAdminImpl;
 
     /**
-     * Topic 对应的路由信息
+     * Map<Topic名称, Topic下面的路由信息>
      */
     private final ConcurrentMap<String/* Topic */, TopicRouteData> topicRouteTable = new ConcurrentHashMap<String, TopicRouteData>();
     private final Lock lockNamesrv = new ReentrantLock();
@@ -134,6 +134,10 @@ public class MQClientInstance {
      * 再平衡执行线程, 将整个平衡操作放到这个线程执行, 不影响整个消费者的线程
      */
     private final RebalanceService rebalanceService;
+
+    /**
+     * 一个 MQ 生产者, 暂时看不出在消费者内部的作用
+     */
     private final DefaultMQProducer defaultMQProducer;
     private final ConsumerStatsManager consumerStatsManager;
     private final AtomicLong sendHeartbeatTimesTotal = new AtomicLong(0);
@@ -260,6 +264,7 @@ public class MQClientInstance {
                     // 启动一个线程, 开始拉取 MQ 消息
                     this.pullMessageService.start();
                     // Start rebalance service
+                    // 启动一个线程, 调整消费端队列的分配平衡
                     this.rebalanceService.start();
                     // Start push service
                     this.defaultMQProducer.getDefaultMQProducerImpl().start(false);
@@ -650,6 +655,7 @@ public class MQClientInstance {
                             }
                         }
                     } else {
+                        // 发送请求, 向 NameServer 获取最新的 Topic 订阅信息
                         topicRouteData = this.mQClientAPIImpl.getTopicRouteInfoFromNameServer(topic, clientConfig.getMqClientApiTimeout());
                     }
                     if (topicRouteData != null) {
@@ -662,9 +668,11 @@ public class MQClientInstance {
                         }
 
                         if (changed) {
+                            // 获取到的最新的订阅信息和本地保存的不一致
                             TopicRouteData cloneTopicRouteData = topicRouteData.cloneTopicRouteData();
 
                             for (BrokerData bd : topicRouteData.getBrokerDatas()) {
+                                // 根据获取到的路由信息更新本地的 Broker 信息
                                 this.brokerAddrTable.put(bd.getBrokerName(), bd.getBrokerAddrs());
                             }
 
@@ -684,17 +692,20 @@ public class MQClientInstance {
 
                             // Update sub info
                             if (!consumerTable.isEmpty()) {
+                                // 获取当前 Topic 在 NameServer 中的消息队列
                                 Set<MessageQueue> subscribeInfo = topicRouteData2TopicSubscribeInfo(topic, topicRouteData);
                                 Iterator<Entry<String, MQConsumerInner>> it = this.consumerTable.entrySet().iterator();
                                 while (it.hasNext()) {
                                     Entry<String, MQConsumerInner> entry = it.next();
                                     MQConsumerInner impl = entry.getValue();
                                     if (impl != null) {
+                                        // 更新对应客户端的订阅队列信息, 消费端的逻辑就是将 Topic 和订阅队列信息放到再平衡业务类里面
                                         impl.updateTopicSubscribeInfo(topic, subscribeInfo);
                                     }
                                 }
                             }
                             log.info("topicRouteTable.put. Topic = {}, TopicRouteData[{}]", topic, cloneTopicRouteData);
+                            // 将对应的订阅信息再维护到一份到当前的客户端中
                             this.topicRouteTable.put(topic, cloneTopicRouteData);
                             return true;
                         }

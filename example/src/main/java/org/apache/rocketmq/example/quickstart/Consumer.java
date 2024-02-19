@@ -35,6 +35,7 @@ public class Consumer {
 
         /*
          * Instantiate with specified consumer group name.
+         * 推模式
          */
         DefaultMQPushConsumer consumer = new DefaultMQPushConsumer(CONSUMER_GROUP);
 

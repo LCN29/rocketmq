@@ -188,6 +188,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
     /**
      * Concurrently max span offset.it has no effect on sequential consumption
      * 最大跨度偏移。它对顺序消耗没有效果
+     * 一个队列中最早和最晚的 2 个消息的偏移差的最大值, 超过了, 拉取请求也会延迟执行
      */
     private int consumeConcurrentlyMaxSpan = 2000;
 
