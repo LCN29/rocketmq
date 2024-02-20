@@ -2011,6 +2011,9 @@ public class DefaultMessageStore implements MessageStore {
 
     class ReputMessageService extends ServiceThread {
 
+        /**
+         * 临界值, 大于等于这个偏移量的消息才会进行重放
+         */
         private volatile long reputFromOffset = 0;
 
         public long getReputFromOffset() {
@@ -2047,35 +2050,44 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         private void doReput() {
+
+            // 如果重放的偏移量小于最小偏移量, 则将重放的偏移量设置为最小偏移量
             if (this.reputFromOffset < DefaultMessageStore.this.commitLog.getMinOffset()) {
                 log.warn("The reputFromOffset={} is smaller than minPyOffset={}, this usually indicate that the dispatch behind too much and the commitlog has expired.",
                     this.reputFromOffset, DefaultMessageStore.this.commitLog.getMinOffset());
                 this.reputFromOffset = DefaultMessageStore.this.commitLog.getMinOffset();
             }
             for (boolean doNext = true; this.isCommitLogAvailable() && doNext; ) {
-
+                // 支持重复投放, 同时当前的投放偏移量已经大于等于确认偏移量, 则退出
                 if (DefaultMessageStore.this.getMessageStoreConfig().isDuplicationEnable()
                     && this.reputFromOffset >= DefaultMessageStore.this.getConfirmOffset()) {
                     break;
                 }
 
+                // 根据读取偏移量到 commitLog 文件中有效数据的最大偏移量
                 SelectMappedBufferResult result = DefaultMessageStore.this.commitLog.getData(reputFromOffset);
                 if (result != null) {
                     try {
                         this.reputFromOffset = result.getStartOffset();
 
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
+
+                            // 生成 DispatchRequest 对象
                             DispatchRequest dispatchRequest =
                                 DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
                             int size = dispatchRequest.getBufferSize() == -1 ? dispatchRequest.getMsgSize() : dispatchRequest.getBufferSize();
 
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
+                                    // 根据 commitLog 文件内容实时构建 consumeQueue、index文件的关键所在
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
+                                    // 开启了长轮询并且角色为主节点，则通知有新消息到达，执行一次 pullRequest 验证
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
                                             && DefaultMessageStore.this.brokerConfig.isLongPollingEnable()
                                             && DefaultMessageStore.this.messageArrivingListener != null) {
+                                        // NotifyMessageArrivingListener 的 arriving 方法
+                                        // 最终调用到 PullRequestHoldService, 重新处理消息拉取请求
                                         DefaultMessageStore.this.messageArrivingListener.arriving(dispatchRequest.getTopic(),
                                             dispatchRequest.getQueueId(), dispatchRequest.getConsumeQueueOffset() + 1,
                                             dispatchRequest.getTagsCode(), dispatchRequest.getStoreTimestamp(),

@@ -68,6 +68,10 @@ import org.apache.rocketmq.store.PutMessageResult;
 import org.apache.rocketmq.store.config.BrokerRole;
 import org.apache.rocketmq.store.stats.BrokerStatsManager;
 
+/**
+ * 处理消费者拉取消息的请求
+ * org.apache.rocketmq.common.protocol.RequestCode#PULL_MESSAGE
+ */
 public class PullMessageProcessor extends AsyncNettyRequestProcessor {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final BrokerController brokerController;
@@ -88,6 +92,14 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor {
         return false;
     }
 
+    /**
+     * 处理消费者拉取消息的请求
+     * @param channel 网络通道
+     * @param request 消费者请求
+     * @param brokerAllowSuspend 是否允许挂起, 默认为 true
+     * @return
+     * @throws RemotingCommandException
+     */
     private RemotingCommand processRequest(final Channel channel, RemotingCommand request, boolean brokerAllowSuspend)
         throws RemotingCommandException {
         final long beginTimeMills = this.brokerController.getMessageStore().now();
@@ -410,9 +422,14 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor {
                     break;
                 case ResponseCode.PULL_NOT_FOUND:
 
+                    // Broker 调用这个方法配置的是否可以挂起标识
+                    // hasSuspendFlag, 消费者拉取消息，拼接的参数的标识
                     if (brokerAllowSuspend && hasSuspendFlag) {
+                        // 挂起多长时间, suspendTimeoutMillisLong 请求里面传过来的, 是消费者的 brokerSuspendMaxTimeMillis 配置
                         long pollingTimeMills = suspendTimeoutMillisLong;
+                        // Broker 本身可以通过 longPollingEnable 配置是否支持长轮训
                         if (!this.brokerController.getBrokerConfig().isLongPollingEnable()) {
+                            // 不支持, 挂起的时间为 shortPollingTimeMills 配置的时间, 默认为 1s
                             pollingTimeMills = this.brokerController.getBrokerConfig().getShortPollingTimeMills();
                         }
 
@@ -421,7 +438,10 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor {
                         int queueId = requestHeader.getQueueId();
                         PullRequest pullRequest = new PullRequest(request, channel, pollingTimeMills,
                             this.brokerController.getMessageStore().now(), offset, subscriptionData, messageFilter);
+                        // 添加到挂起线程中的 Map
                         this.brokerController.getPullRequestHoldService().suspendPullRequest(topic, queueId, pullRequest);
+                        // 设置 response = null
+                        // 表示这次请求不会向客户端进行响应, 不会触发对响应结果的处理，处于等待状态
                         response = null;
                         break;
                     }
@@ -555,6 +575,7 @@ public class PullMessageProcessor extends AsyncNettyRequestProcessor {
             @Override
             public void run() {
                 try {
+                    // 重新调用 processRequest 方法, 进行拉取消息的处理
                     final RemotingCommand response = PullMessageProcessor.this.processRequest(channel, request, false);
 
                     if (response != null) {
