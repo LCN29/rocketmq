@@ -34,7 +34,13 @@ public class HAConnection {
     private final HAService haService;
     private final SocketChannel socketChannel;
     private final String clientAddr;
+    /**
+     * 向从节点写数据业务线程
+     */
     private final WriteSocketService writeSocketService;
+    /**
+     * 从从节点读数据业务线程
+     */
     private final ReadSocketService readSocketService;
 
     private volatile long slaveRequestOffset = -1;
@@ -108,8 +114,10 @@ public class HAConnection {
         private volatile long lastReadTimestamp = System.currentTimeMillis();
 
         public ReadSocketService(final SocketChannel socketChannel) throws IOException {
+            // 重新启动一个选择器
             this.selector = RemotingUtil.openSelector();
             this.socketChannel = socketChannel;
+            // 监听读事件
             this.socketChannel.register(this.selector, SelectionKey.OP_READ);
             this.setDaemon(true);
         }
@@ -172,9 +180,10 @@ public class HAConnection {
                             int pos = this.byteBufferRead.position() - (this.byteBufferRead.position() % 8);
                             long readOffset = this.byteBufferRead.getLong(pos - 8);
                             this.processPosition = pos;
-
+                            // 保存从节点的同步进度
                             HAConnection.this.slaveAckOffset = readOffset;
                             if (HAConnection.this.slaveRequestOffset < 0) {
+                                // 更新为从节点发送的同步进度
                                 HAConnection.this.slaveRequestOffset = readOffset;
                                 log.info("slave[" + HAConnection.this.clientAddr + "] request offset " + readOffset);
                             } else if (HAConnection.this.slaveAckOffset > HAConnection.this.haService.getDefaultMessageStore().getMaxPhyOffset()) {
@@ -217,6 +226,7 @@ public class HAConnection {
         private long lastWriteTimestamp = System.currentTimeMillis();
 
         public WriteSocketService(final SocketChannel socketChannel) throws IOException {
+            // 重新启动一个选择器
             this.selector = RemotingUtil.openSelector();
             this.socketChannel = socketChannel;
             this.socketChannel.register(this.selector, SelectionKey.OP_WRITE);
@@ -231,14 +241,19 @@ public class HAConnection {
                 try {
                     this.selector.select(1000);
 
+                    // 从节点请求同步进度
                     if (-1 == HAConnection.this.slaveRequestOffset) {
                         Thread.sleep(10);
                         continue;
                     }
 
+                    // 初次进行数据同步
                     if (-1 == this.nextTransferFromWhere) {
+                        // 0 为第一次同步
                         if (0 == HAConnection.this.slaveRequestOffset) {
+                            // 从 master 节点最大偏移量从开始传输
                             long masterOffset = HAConnection.this.haService.getDefaultMessageStore().getCommitLog().getMaxOffset();
+                            // 最大偏移量 % commitLog 的大小 得到同步的偏移量
                             masterOffset =
                                 masterOffset
                                     - (masterOffset % HAConnection.this.haService.getDefaultMessageStore().getMessageStoreConfig()
@@ -248,8 +263,10 @@ public class HAConnection {
                                 masterOffset = 0;
                             }
 
+                            // 更新 nextTransferFromWhere
                             this.nextTransferFromWhere = masterOffset;
                         } else {
+                            // 根据从节点发送的偏移量开始数据同步
                             this.nextTransferFromWhere = HAConnection.this.slaveRequestOffset;
                         }
 
@@ -257,11 +274,12 @@ public class HAConnection {
                             + "], and slave request " + HAConnection.this.slaveRequestOffset);
                     }
 
+                    // 上一次写入已经完成
                     if (this.lastWriteOver) {
-
+                        // 获取上一次写入的时间
                         long interval =
                             HAConnection.this.haService.getDefaultMessageStore().getSystemClock().now() - this.lastWriteTimestamp;
-
+                        // 时间超过了心跳时间
                         if (interval > HAConnection.this.haService.getDefaultMessageStore().getMessageStoreConfig()
                             .getHaSendHeartbeatInterval()) {
 
@@ -271,17 +289,20 @@ public class HAConnection {
                             this.byteBufferHeader.putLong(this.nextTransferFromWhere);
                             this.byteBufferHeader.putInt(0);
                             this.byteBufferHeader.flip();
-
+                            // 推送数据
                             this.lastWriteOver = this.transferData();
                             if (!this.lastWriteOver)
                                 continue;
                         }
                     } else {
+                        // 未传输完毕，继续上次的传输
                         this.lastWriteOver = this.transferData();
+                        // 如果依旧未完成，结束本次处理
                         if (!this.lastWriteOver)
                             continue;
                     }
 
+                    // 根据偏移量获取消息数据
                     SelectMappedBufferResult selectResult =
                         HAConnection.this.haService.getDefaultMessageStore().getCommitLogData(this.nextTransferFromWhere);
                     if (selectResult != null) {
@@ -291,6 +312,7 @@ public class HAConnection {
                         }
 
                         long thisOffset = this.nextTransferFromWhere;
+                        // 更新下次传输的偏移量地址
                         this.nextTransferFromWhere += size;
 
                         selectResult.getByteBuffer().limit(size);
