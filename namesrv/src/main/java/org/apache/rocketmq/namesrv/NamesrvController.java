@@ -42,22 +42,61 @@ import org.apache.rocketmq.srvutil.FileWatchService;
 public class NamesrvController {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
 
+    /**
+     * Namesrv 本身的配置
+     */
     private final NamesrvConfig namesrvConfig;
 
+    /**
+     * 在 Namesrv 中启动一个 Netty 服务端相关的配置
+     */
     private final NettyServerConfig nettyServerConfig;
 
+    /**
+     * 定时任务执行线程池
+     */
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
         "NSScheduledThread"));
+
+    /**
+     * 配置管理类
+     * 将配置文件 (默认, ${user.home}/namesrv/kvConfig.json) 加载到自身的 HashMap (Map<命名空间, Map<配置的 key, 配置的 value>)中
+     * 同时支持增改和存储, 其他应用可以通过 PUT_KV_CONFIG(100) 这个操作码, 将配置存储到 Nameserver 中, GET_KV_CONFIG(101) 进去获取
+     */
     private final KVConfigManager kvConfigManager;
+
+    /**
+     * 保存在当前 Namesrv 的路由信息,
+     * 包含了集群 --> Broker --> Queue --> Topic 等信息
+     */
     private final RouteInfoManager routeInfoManager;
 
+    /**
+     * Namesrv 中启动的 Netty 服务端, 用于处理各个客户端的请求
+     */
     private RemotingServer remotingServer;
 
+    /**
+     * 通道监听器, 连接到当前 Namesrv 的应用的各种事件监听处理,
+     * 比如: 连接, 断开等
+     */
     private BrokerHousekeepingService brokerHousekeepingService;
 
+    /**
+     * RemotingServer 内部中用于处理请求的线程池
+     */
     private ExecutorService remotingExecutor;
 
+    /**
+     * 将 NamesrvConfig 和 NettyServerConfig 配置以 Properties 的形式存放到 Configuration 中
+     */
     private Configuration configuration;
+
+    /**
+     * 文件变更监听线程
+     * 主要用于判断 ttl 等证书的变更时, 重新加载,
+     * tls.server.mode 属性不为 disabled 才起作用
+     */
     private FileWatchService fileWatchService;
 
     public NamesrvController(NamesrvConfig namesrvConfig, NettyServerConfig nettyServerConfig) {

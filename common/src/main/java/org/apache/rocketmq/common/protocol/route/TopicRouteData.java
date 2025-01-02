@@ -23,9 +23,14 @@ package org.apache.rocketmq.common.protocol.route;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+
 import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
 
 public class TopicRouteData extends RemotingSerializable {
+
+    /**
+     * 顺序消息配置
+     */
     private String orderTopicConf;
 
     /**
@@ -40,6 +45,10 @@ public class TopicRouteData extends RemotingSerializable {
      */
     private List<BrokerData> brokerDatas;
 
+    /**
+     * key: brokerAddr, value: filterServer
+     * 支持的消息过滤服务器
+     */
     private HashMap<String/* brokerAddr */, List<String>/* Filter Server */> filterServerTable;
 
     public TopicRouteData cloneTopicRouteData() {
@@ -142,6 +151,6 @@ public class TopicRouteData extends RemotingSerializable {
     @Override
     public String toString() {
         return "TopicRouteData [orderTopicConf=" + orderTopicConf + ", queueDatas=" + queueDatas
-            + ", brokerDatas=" + brokerDatas + ", filterServerTable=" + filterServerTable + "]";
+                + ", brokerDatas=" + brokerDatas + ", filterServerTable=" + filterServerTable + "]";
     }
 }

@@ -52,11 +52,12 @@ import org.apache.rocketmq.remoting.common.RemotingUtil;
 
 public class RouteInfoManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);
+    // broker 失效时间 120s (心跳多久没更新)
     private final static long BROKER_CHANNEL_EXPIRED_TIME = 1000 * 60 * 2;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     /**
-     * topic 在 broker 的队列信息
+     * topic 在 broker 的队列信息, 消息发送时根据这个对象进行负载均衡
      */
     private final HashMap<String/* topic */, Map<String /* brokerName */ , QueueData>> topicQueueTable;
 
@@ -71,9 +72,13 @@ public class RouteInfoManager {
     private final HashMap<String/* clusterName */, Set<String/* brokerName */>> clusterAddrTable;
 
     /**
-     * broker 心跳信息， key 为 brokerAddr
+     * broker 状态信息， key 为 brokerAddr, 每次 Broker 上报的信息都会更新这个表
      */
     private final HashMap<String/* brokerAddr */, BrokerLiveInfo> brokerLiveTable;
+
+    /**
+     * Broker 上的 FilterServer 列表, 用于过滤标签（Tag）或 SQL 表达式, 以减轻 Consumer 的负担, 提高消息消费的效率
+     */
     private final HashMap<String/* brokerAddr */, List<String>/* Filter Server */> filterServerTable;
 
     public RouteInfoManager() {
