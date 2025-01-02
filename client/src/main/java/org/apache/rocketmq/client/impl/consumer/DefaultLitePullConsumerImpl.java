@@ -838,6 +838,9 @@ public class DefaultLitePullConsumerImpl implements MQConsumerInner {
         return this.mQClientFactory.getMQAdminImpl().searchOffset(mq, timestamp);
     }
 
+    /**
+     * 拉取任务业务实现类
+     */
     public class PullTaskImpl implements Runnable {
         private final MessageQueue messageQueue;
         private volatile boolean cancelled = false;

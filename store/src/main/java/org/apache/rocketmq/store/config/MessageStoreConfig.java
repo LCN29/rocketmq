@@ -40,7 +40,10 @@ public class MessageStoreConfig {
 
     private String readOnlyCommitLogStorePaths = null;
 
-    // CommitLog file size, default is 1G
+    /**
+     *  CommitLog file size, default is 1G
+     *  CommitLog 文件大小, 默认为 1G
+     */
     private int mappedFileSizeCommitLog = 1024 * 1024 * 1024;
     // ConsumeQueue file size,default is 30W
     private int mappedFileSizeConsumeQueue = 300000 * ConsumeQueue.CQ_STORE_UNIT_SIZE;
@@ -155,11 +158,20 @@ public class MessageStoreConfig {
     @ImportantField
     private boolean messageIndexSafe = false;
     private int haListenPort = 10912;
+    /**
+     * 从节点向父节点上报同步偏移量的间隔
+     */
     private int haSendHeartbeatInterval = 1000 * 5;
+    /**
+     * HA 心跳检测间隔
+     */
     private int haHousekeepingInterval = 1000 * 20;
     private int haTransferBatchSize = 1024 * 32;
     @ImportantField
     private String haMasterAddress = null;
+    /**
+     * 主从节点的 commitLog 之间的最大偏移字节数, 超过了从节点不可用
+     */
     private int haSlaveFallbehindMax = 1024 * 1024 * 256;
     @ImportantField
     private BrokerRole brokerRole = BrokerRole.ASYNC_MASTER;

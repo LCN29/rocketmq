@@ -948,13 +948,16 @@ public class CommitLog {
     }
 
     public CompletableFuture<PutMessageStatus> submitReplicaRequest(AppendMessageResult result, MessageExt messageExt) {
+        // 配置的是实时同步到从节点
         if (BrokerRole.SYNC_MASTER == this.defaultMessageStore.getMessageStoreConfig().getBrokerRole()) {
             HAService service = this.defaultMessageStore.getHaService();
             if (messageExt.isWaitStoreMsgOK()) {
+                // 从节点的状态符合
                 if (service.isSlaveOK(result.getWroteBytes() + result.getWroteOffset())) {
                     GroupCommitRequest request = new GroupCommitRequest(result.getWroteOffset() + result.getWroteBytes(),
                             this.defaultMessageStore.getMessageStoreConfig().getSlaveTimeout());
                     service.putRequest(request);
+                    // 唤醒所有阻塞在 haService 上面锁的线程
                     service.getWaitNotifyObject().wakeupAll();
                     return request.future();
                 }
@@ -963,6 +966,7 @@ public class CommitLog {
                 }
             }
         }
+        // 否则直接成功
         return CompletableFuture.completedFuture(PutMessageStatus.PUT_OK);
     }
 
