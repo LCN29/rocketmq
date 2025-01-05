@@ -160,8 +160,7 @@ public class BrokerConfig {
     private boolean forceRegister = true;
 
     /**
-     * This configurable item defines interval of topics registration of broker to name server. Allowing values are
-     * between 10, 000 and 60, 000 milliseconds.
+     * Broker 和 NameServer 之间注册 Topic 的间隔时间, 子啊 10,000 和 60,000 之间，默认 30,000 毫秒
      */
     private int registerNameServerPeriod = 1000 * 30;
 
