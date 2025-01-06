@@ -116,75 +116,159 @@ public class BrokerController {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private static final InternalLogger LOG_PROTECTION = InternalLoggerFactory.getLogger(LoggerName.PROTECTION_LOGGER_NAME);
     private static final InternalLogger LOG_WATER_MARK = InternalLoggerFactory.getLogger(LoggerName.WATER_MARK_LOGGER_NAME);
+
+    // broker 配置
     private final BrokerConfig brokerConfig;
+
+    // 作为 netty 服务端配置
     private final NettyServerConfig nettyServerConfig;
+
+    // 作为 netty 客户端配置
     private final NettyClientConfig nettyClientConfig;
+
+    // 消息存储配置
     private final MessageStoreConfig messageStoreConfig;
+
+    // 消费者偏移量管理器，维护 offset 进度信息
     private final ConsumerOffsetManager consumerOffsetManager;
+
+    // 消费者管理类，维护消费者组的注册实例信息以及 topic 的订阅信息，并对消费者 id 变化进行监听
     private final ConsumerManager consumerManager;
+
+    // 消费者过滤管理器，配置文件为：xx/config/consumerFilter.json
     private final ConsumerFilterManager consumerFilterManager;
+
+    // 生产者管理器，包含生产者的注册信息，通过 groupName 分组
     private final ProducerManager producerManager;
+
+    // 客户端连接心跳服务，用于定时扫描生产者和消费者客户端，并将不活跃的客户端通道及相关信息移除
     private final ClientHousekeepingService clientHousekeepingService;
+
+    // 拉取消息请求管理器，用于处理拉取消息请求
     private final PullMessageProcessor pullMessageProcessor;
+
+    // 拉取请求挂起服务，处理无消息时 push 长轮询消费者的挂起等待机制
     private final PullRequestHoldService pullRequestHoldService;
+
+    // 消息送达的监听器，生产者消息到达时通过该监听器触发 pullRequestHoldService
     private final MessageArrivingListener messageArrivingListener;
+
+    // 处理某些 broker 到客户端的请求，例如检查生产者的事务状态，重置 offset
     private final Broker2Client broker2Client;
+
+    // 订阅分组关系管理器，维护消费者组的一些附加运维信息
     private final SubscriptionGroupManager subscriptionGroupManager;
+
+    // 消费者 id 变化监听器
     private final ConsumerIdsChangeListener consumerIdsChangeListener;
     private final RebalanceLockManager rebalanceLockManager = new RebalanceLockManager();
-    private final BrokerOuterAPI brokerOuterAPI;
-    private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
-        "BrokerControllerScheduledThread"));
-    private final SlaveSynchronize slaveSynchronize;
-    private final BlockingQueue<Runnable> sendThreadPoolQueue;
-    private final BlockingQueue<Runnable> putThreadPoolQueue;
-    private final BlockingQueue<Runnable> pullThreadPoolQueue;
-    private final BlockingQueue<Runnable> replyThreadPoolQueue;
-    private final BlockingQueue<Runnable> queryThreadPoolQueue;
-    private final BlockingQueue<Runnable> clientManagerThreadPoolQueue;
-    private final BlockingQueue<Runnable> heartbeatThreadPoolQueue;
-    private final BlockingQueue<Runnable> consumerManagerThreadPoolQueue;
-    private final BlockingQueue<Runnable> endTransactionThreadPoolQueue;
-    private final BrokerStatsManager brokerStatsManager;
-    private final List<SendMessageHook> sendMessageHookList = new ArrayList<SendMessageHook>();
-    private final List<ConsumeMessageHook> consumeMessageHookList = new ArrayList<ConsumeMessageHook>();
-    private final BrokerFastFailure brokerFastFailure;
-    private final Configuration configuration;
-    private final Map<Class, AccessValidator> accessValidatorMap = new HashMap<Class, AccessValidator>();
 
-    /**
-     * 消息存储对象
-     * 包含了各个消息文件, commitLog, consumerQueue 等的处理
-     */
+    // broker 对外访问的 API, 处理 broker 对外的发起请求，比如向 nameServer 注册，向 master、slave 发起的请求
+    private final BrokerOuterAPI brokerOuterAPI;
+
+    // 用于从节点，定时向主节点发起请求同步数据，例如 topic 配置、消费位移等
+    private final SlaveSynchronize slaveSynchronize;
+
+    // 处理来自生产者的发送消息的请求的队列
+    private final BlockingQueue<Runnable> sendThreadPoolQueue;
+
+    // 处理来自生产者的发送消息的请求的队列
+    private final BlockingQueue<Runnable> putThreadPoolQueue;
+
+    // 处理来自消费者的拉取消息的请求的队列
+    private final BlockingQueue<Runnable> pullThreadPoolQueue;
+
+    // 处理 reply 消息的请求的队列，RocketMQ4.7.0 版本中增加了 request-reply 新特性，该特性允许 producer 在发送消息后同步或者异步等待 consumer 消费完消息并返回响应消息，类似 rpc 调用效果。
+    // 即生产者发送了消息之后，可以同步或者异步的收到消费了这条消息的消费者的响应
+    private final BlockingQueue<Runnable> replyThreadPoolQueue;
+
+    // 处理查询请求的队列
+    private final BlockingQueue<Runnable> queryThreadPoolQueue;
+
+    // 客户端管理器的队列
+    private final BlockingQueue<Runnable> clientManagerThreadPoolQueue;
+
+    // 心跳处理的队列
+    private final BlockingQueue<Runnable> heartbeatThreadPoolQueue;
+
+    // 消费者管理器的队列，目前没用到
+    private final BlockingQueue<Runnable> consumerManagerThreadPoolQueue;
+
+    // 处理事务消息的队列
+    private final BlockingQueue<Runnable> endTransactionThreadPoolQueue;
+
+    // broker 状态管理器，保存 Broker 运行时状态
+    private final BrokerStatsManager brokerStatsManager;
+
+    // broker 快速失败服务
+    private final BrokerFastFailure brokerFastFailure;
+
+    // 配置类
+    private final Configuration configuration;
+
+    // 消息存储对象, 包含了各个消息文件, commitLog, consumerQueue 等的处理
     private MessageStore messageStore;
+
+    // Netty 服务端对象
     private RemotingServer remotingServer;
+
+    // Netty 服务端对象, 用于快速失败
     private RemotingServer fastRemotingServer;
 
-    /**
-     * Topic 配置管理器
-     */
+    // Topic 配置管理器
     private TopicConfigManager topicConfigManager;
+
+    // 定时任务执行线程池
+    private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
+            "BrokerControllerScheduledThread"));
+
+    // 消息发送线程池
     private ExecutorService sendMessageExecutor;
-    /**
-     * 用户处理生产者/消费者发送消息处理完成后, 执行对应的回调函数
-     */
+    // 用户处理生产者/消费者发送消息处理完成后, 执行对应的回调函数
     private ExecutorService putMessageFutureExecutor;
+    // 处理拉取消息的请求的线程池
     private ExecutorService pullMessageExecutor;
+    // 处理 reply 消息的请求的线程池
     private ExecutorService replyMessageExecutor;
+    // 处理查询请求的线程池
     private ExecutorService queryMessageExecutor;
+    // broker 管理线程池, 作为默认处理器的线程池
     private ExecutorService adminBrokerExecutor;
+    // 客户端管理器的线程池
     private ExecutorService clientManageExecutor;
+    // 心跳处理的线程池
     private ExecutorService heartbeatExecutor;
+    // 消费者管理的线程池
     private ExecutorService consumerManageExecutor;
+    // 处理事务消息的线程池
     private ExecutorService endTransactionExecutor;
+
     private boolean updateMasterHAServerAddrPeriodically = false;
+
+    // broker 状态管理器, 保存 Broker 运行时状态，统计工作
     private BrokerStats brokerStats;
     private InetSocketAddress storeHost;
+
+    // 文件监听服务
     private FileWatchService fileWatchService;
+
+    // TransactionalMessageCheckService 服务, 该服务内部有一个线程
+    // 会定时每一分钟 (可通过在 broker.conf 文件设置 transactionCheckInterval 属性更改) 触发事务检查的逻辑, 内部调用 TransactionalMessageService#check 方法
+    // 默认情况下, 6 秒以上没 commit/rollback 的事务消息才会触发事务回查，而如果回查次数超过 15 次则丢弃事务
     private TransactionalMessageCheckService transactionalMessageCheckService;
+
+    // 事务消息服务。用于处理、检查事务消息
     private TransactionalMessageService transactionalMessageService;
+
+    // 基于 Java 的 SPI 机制，查找 "META-INF/service/org.apache.rocketmq.broker.transaction.AbstractTransactionalMessageCheckListener" 文件里面的 SPI 实现
+    // 事务消息检查监听器
     private AbstractTransactionalMessageCheckListener transactionalMessageCheckListener;
+
     private Future<?> slaveSyncFuture;
+
+    private final List<SendMessageHook> sendMessageHookList = new ArrayList<SendMessageHook>();
+    private final List<ConsumeMessageHook> consumeMessageHookList = new ArrayList<ConsumeMessageHook>();
+    private final Map<Class, AccessValidator> accessValidatorMap = new HashMap<Class, AccessValidator>();
 
     public BrokerController(
         final BrokerConfig brokerConfig,
@@ -251,10 +335,18 @@ public class BrokerController {
     }
 
     public boolean initialize() throws CloneNotSupportedException {
-        boolean result = this.topicConfigManager.load();
 
+        // 下面的 4 个配置文件都是通过 ConfigManager 的子类实现的
+        // 里面的配置文件的根目录默认为 ${user.home}
+        // 本代码为了便于管理各种文件, 将其修改为了 ${ROCKETMQ_HOME}
+
+        // 加载 Topic 配置, 存放到 topicConfigTable 中
+        boolean result = this.topicConfigManager.load();
+        // 加载消费者偏移量配置, 存放到 offsetTable 中
         result = result && this.consumerOffsetManager.load();
+        // 加载订阅分组配置, 存放到 subscriptionGroupTable 中
         result = result && this.subscriptionGroupManager.load();
+        // 加载消费者过滤配置, 存放到 filterDataByTopic 中
         result = result && this.consumerFilterManager.load();
 
         if (result) {
@@ -267,9 +359,11 @@ public class BrokerController {
                     ((DLedgerCommitLog)((DefaultMessageStore) messageStore).getCommitLog()).getdLedgerServer().getdLedgerLeaderElector().addRoleChangeHandler(roleChangeHandler);
                 }
                 this.brokerStats = new BrokerStats((DefaultMessageStore) this.messageStore);
-                //load plugin
+                // load plugin
+                // 可以重新设置新的 MessageStore 对象
                 MessageStorePluginContext context = new MessageStorePluginContext(messageStoreConfig, brokerStatsManager, messageArrivingListener, brokerConfig);
                 this.messageStore = MessageStoreFactory.build(context, this.messageStore);
+                // 添加一个针对布隆过滤器的消费过滤类
                 this.messageStore.getDispatcherList().addFirst(new CommitLogDispatcherCalcBitMap(this.brokerConfig, this.consumerFilterManager));
             } catch (IOException e) {
                 result = false;
@@ -277,13 +371,18 @@ public class BrokerController {
             }
         }
         // 从磁盘中加载已有的消息文件
+        // 比如 commitLog 日志文件、consumeQueue 消息消费队列文件的加载，indexFile 索引文件的构建
+        // messageStore 还会将这些文件的内容加载到内存中，并且完成 RocketMQ 的数据恢复
         result = result && this.messageStore.load();
 
         if (result) {
+            // 启动 Netty 服务端和快速 Netty 快速通道服务端
             this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.clientHousekeepingService);
             NettyServerConfig fastConfig = (NettyServerConfig) this.nettyServerConfig.clone();
             fastConfig.setListenPort(nettyServerConfig.getListenPort() - 2);
             this.fastRemotingServer = new NettyRemotingServer(fastConfig, this.clientHousekeepingService);
+
+            // 处理发送消息的请求的线程池
             this.sendMessageExecutor = new BrokerFixedThreadPoolExecutor(
                 this.brokerConfig.getSendMessageThreadPoolNums(),
                 this.brokerConfig.getSendMessageThreadPoolNums(),
@@ -356,9 +455,12 @@ public class BrokerController {
                 Executors.newFixedThreadPool(this.brokerConfig.getConsumerManageThreadPoolNums(), new ThreadFactoryImpl(
                     "ConsumerManageThread_"));
 
+            // 注册处理请求的处理器
             this.registerProcessor();
 
             final long initialDelay = UtilAll.computeNextMorningTimeMillis() - System.currentTimeMillis();
+
+            // 每隔 24h 打印昨天生产和消费的消息数量
             final long period = 1000 * 60 * 60 * 24;
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
@@ -368,6 +470,7 @@ public class BrokerController {
                 }
             }, initialDelay, period, TimeUnit.MILLISECONDS);
 
+            // 每隔 5s 將消费者 offset 进行持久化, 存入 consumerOffset.json 文件中
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
                     BrokerController.this.consumerOffsetManager.persist();
@@ -376,6 +479,7 @@ public class BrokerController {
                 }
             }, 1000 * 10, this.brokerConfig.getFlushConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
 
+            // 每隔 10s 將消费过滤信息进行持久化，存入 consumerFilter.json 文件中
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
                     BrokerController.this.consumerFilterManager.persist();
@@ -384,6 +488,8 @@ public class BrokerController {
                 }
             }, 1000 * 10, 1000 * 10, TimeUnit.MILLISECONDS);
 
+            // 每隔 3m 检查消费者的消费进度
+            // 当消费进度落后阈值的时候，并且 disableConsumeIfConsumerReadSlowly=true (默认false)，就停止消费者消费，保护 broker, 避免消费积压
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
                     BrokerController.this.protectBroker();
@@ -392,6 +498,7 @@ public class BrokerController {
                 }
             }, 3, 3, TimeUnit.MINUTES);
 
+            // 每隔 1s 打印发送消息线程池队列、拉取消息线程池队列、查询消息线程池队列、结束事务线程池队列的大小以及队列头部元素存在时间
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
                     BrokerController.this.printWaterMark();
@@ -400,6 +507,7 @@ public class BrokerController {
                 }
             }, 10, 1, TimeUnit.SECONDS);
 
+            // 每隔 1m 將打印已存储在 commitLog 提交日志中但尚未分派到 consume queue 消费队列的字节数
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
                     log.info("dispatch behind commit log {} bytes", BrokerController.this.getMessageStore().dispatchBehindBytes());
@@ -409,8 +517,11 @@ public class BrokerController {
             }, 1000 * 10, 1000 * 60, TimeUnit.MILLISECONDS);
 
             if (this.brokerConfig.getNamesrvAddr() != null) {
+                // 如果配置了 namesrvAddr, 更新 nameServer 地址列表
                 this.brokerOuterAPI.updateNameServerAddressList(this.brokerConfig.getNamesrvAddr());
                 log.info("Set user specified name server address: {}", this.brokerConfig.getNamesrvAddr());
+
+                // 如果配置了 namesrvAddr, 每隔 2m 更新 nameServer 地址列表
                 this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                     try {
                         BrokerController.this.brokerOuterAPI.updateNameServerAddressList(BrokerController.this.brokerConfig.getNamesrvAddr());
@@ -419,6 +530,9 @@ public class BrokerController {
                     }
                 }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
             } else if (this.brokerConfig.isFetchNamesrvAddrByAddressServer()) {
+                // 如果没有指定 nameServer 地址，并且允许从地址服务器获取 nameServer 地址
+                // 那么每隔 2m 从 nameServer 地址服务器拉取最新的 nameServer 地址并更新
+                // 要想动态更新 nameServer 地址，需要指定一个地址服务器的 url，并且 fetchNamesrvAddrByAddressServer 设置为 true
                 this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                     try {
                         BrokerController.this.brokerOuterAPI.fetchNameServerAddr();
@@ -428,6 +542,7 @@ public class BrokerController {
                 }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
             }
 
+            // 如果没有开启 DLeger 服务，DLeger 开启后表示支持高可用的主从自动切换
             if (!messageStoreConfig.isEnableDLegerCommitLog()) {
                 if (BrokerRole.SLAVE == this.messageStoreConfig.getBrokerRole()) {
                     if (this.messageStoreConfig.getHaMasterAddress() != null && this.messageStoreConfig.getHaMasterAddress().length() >= 6) {
@@ -447,6 +562,8 @@ public class BrokerController {
                 }
             }
 
+            // Tls 传输相关配置，通信安全的文件监听模块，用来观察网络加密配置文件的更改
+            // 默认是 PERMISSIVE，因此会进入代码块
             if (TlsSystemConfig.tlsMode != TlsMode.DISABLED) {
                 // Register a listener to reload SslContext
                 try {
@@ -487,8 +604,11 @@ public class BrokerController {
                     log.warn("FileWatchService created error, can't load the certificate dynamically");
                 }
             }
+            // 初始化事务消息相关服务
             initialTransaction();
+            // 初始化 acl 相关服务
             initialAcl();
+            // 初始化 rpc hook 相关服务
             initialRpcHooks();
         }
         return result;
