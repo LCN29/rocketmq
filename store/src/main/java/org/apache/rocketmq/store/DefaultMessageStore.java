@@ -153,50 +153,72 @@ public class DefaultMessageStore implements MessageStore {
 
     public DefaultMessageStore(final MessageStoreConfig messageStoreConfig, final BrokerStatsManager brokerStatsManager,
         final MessageArrivingListener messageArrivingListener, final BrokerConfig brokerConfig) throws IOException {
+
+        // 消息送达的监听器，生产者消息到达时通过该监听器触发 pullRequestHoldService
+        // 默认实现 NotifyMessageArrivingListener
         this.messageArrivingListener = messageArrivingListener;
         this.brokerConfig = brokerConfig;
         this.messageStoreConfig = messageStoreConfig;
+        // broker 状态管理器, 保存 Broker 运行时状态，统计工作
         this.brokerStatsManager = brokerStatsManager;
+        // 创建 MappedFile 文件的服务，用于初始化 MappedFile 和预热 MappedFile
         this.allocateMappedFileService = new AllocateMappedFileService(this);
+        // 实例化 CommitLog, DLedgerCommitLog 表示主持主从自动切换功能，默认是 CommitLog 类型
         if (messageStoreConfig.isEnableDLegerCommitLog()) {
             this.commitLog = new DLedgerCommitLog(this);
         } else {
             this.commitLog = new CommitLog(this);
         }
-        this.consumeQueueTable = new ConcurrentHashMap<>(32);
 
+        // topic 的 ConsumeQueueMap 的对应关系
+        this.consumeQueueTable = new ConcurrentHashMap<>(32);
+        // ConsumeQueue 文件的刷盘服务
         this.flushConsumeQueueService = new FlushConsumeQueueService();
+        // 清除过期 CommitLog 文件的服务
         this.cleanCommitLogService = new CleanCommitLogService();
+        // 清除过期 ConsumeQueue 文件的服务
         this.cleanConsumeQueueService = new CleanConsumeQueueService();
+        // 存储一些统计指标信息的服务
         this.storeStatsService = new StoreStatsService();
+        // IndexFile 索引文件服务
         this.indexService = new IndexService(this);
+        // 高可用服务, 默认为 null
         if (!messageStoreConfig.isEnableDLegerCommitLog()) {
             this.haService = new HAService(this);
         } else {
             this.haService = null;
         }
+        // 根据 CommitLog 文件，更新 index 文件索引和 ConsumeQueue 文件偏移量的服务
         this.reputMessageService = new ReputMessageService();
-
+        // 处理 RocketMQ 延迟消息的服务
         this.scheduleMessageService = new ScheduleMessageService(this);
-
+        // 初始化 MappedFile 的时候进行 ByteBuffer 的分配回收
         this.transientStorePool = new TransientStorePool(messageStoreConfig);
-
+        // 如果当前节点不是从节点，并且是异步刷盘策略，并且 transientStorePoolEnable 参数配置为true，则启动该服务
         if (messageStoreConfig.isTransientStorePoolEnable()) {
             this.transientStorePool.init();
         }
-
+        // 启动 MappedFile 文件服务线程
         this.allocateMappedFileService.start();
-
+        // 启动 index 索引文件服务线程
         this.indexService.start();
 
+        // 转发服务列表，监听 CommitLog 文件中的新消息存储，然后会调用列表中的 CommitLogDispatcher#dispatch 方法
         this.dispatcherList = new LinkedList<>();
+        // 通知 ConsumeQueue 的 Dispatcher, 可用于更新 ConsumeQueue 的偏移量等信息
         this.dispatcherList.addLast(new CommitLogDispatcherBuildConsumeQueue());
+        // 通知 IndexFile 的 Dispatcher, 可用于更新 IndexFile 的索引信息
         this.dispatcherList.addLast(new CommitLogDispatcherBuildIndex());
-
+        // 获取锁文件，路径就是配置的 {storePathRootDir}/lock
         File file = new File(StorePathConfigHelper.getLockFile(messageStoreConfig.getStorePathRootDir()));
+        // 确保创建 file 文件的父目录, 即 {storePathRootDir} 目录
         MappedFile.ensureDirOK(file.getParent());
+        // 确保创建 commitLog 目录, 即 {StorePathCommitLog} 目录
         MappedFile.ensureDirOK(getStorePathPhysic());
+        // 确保创建 consumeQueue 目录，即{storePathRootDir}/consumequeue 目录
         MappedFile.ensureDirOK(getStorePathLogic());
+        // 创建 lockfile 文件，名为 lock，权限是"读写"，这是一个锁文件，用于获取文件锁。
+        // 文件锁用来保证磁盘上的这些存储文件同时只能有一个 Broker 的 messageStore 来操作
         lockFile = new RandomAccessFile(file, "rw");
     }
 
@@ -217,6 +239,10 @@ public class DefaultMessageStore implements MessageStore {
         boolean result = true;
 
         try {
+            // 判断 ${ROCKET_HOME}/store/abort 文件是否存在
+            // Broker 在启动时会创建 {storePathRootDir}/abort 文件，并且注册钩子函数: 在 JVM 退出时删除 abort 文件
+            // 如果下一次启动时存在 abort 文件, 说明 Broker 是异常退出的, 文件数据可能不一致, 需要进行数据修复
+            // 入口: org.apache.rocketmq.store.DefaultMessageStore.start
             boolean lastExitOK = !this.isTempFileExist();
             log.info("last shutdown {}", lastExitOK ? "normally" : "abnormally");
 
@@ -1419,6 +1445,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     private boolean isTempFileExist() {
+        // ${ROCKET_HOME}/store/abort 文件
         String fileName = StorePathConfigHelper.getAbortFile(this.messageStoreConfig.getStorePathRootDir());
         File file = new File(fileName);
         return file.exists();

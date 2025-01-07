@@ -26,7 +26,7 @@ public class MessageStoreConfig {
 
     public static final String MULTI_PATH_SPLITTER = System.getProperty("rocketmq.broker.multiPathSplitter", ",");
 
-    //The root directory in which the log data is kept
+    // The root directory in which the log data is kept
     // 存储目录从 System.getProperty("user.home") 修改为 System.getProperty(ROCKETMQ_HOME)
     @ImportantField
     private String storePathRootDir = MixAll.ROCKET_MQ_HOME + File.separator + "store";

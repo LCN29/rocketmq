@@ -77,7 +77,7 @@ public class NamesrvController {
     private RemotingServer remotingServer;
 
     /**
-     * 通道监听器, 连接到当前 Namesrv 的应用的各种事件监听处理,
+     * 通道监听器, 连接到当前 Namesrv 的应用的各种事件监听处理
      * 比如: 连接, 断开等
      */
     private BrokerHousekeepingService brokerHousekeepingService;
