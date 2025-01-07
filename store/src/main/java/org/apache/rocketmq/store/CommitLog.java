@@ -1437,7 +1437,7 @@ public class CommitLog {
                 int msgIdLen = (sysflag & MessageSysFlag.STOREHOSTADDRESS_V6_FLAG) == 0 ? 4 + 4 + 8 : 16 + 4 + 8;
                 ByteBuffer msgIdBuffer = ByteBuffer.allocate(msgIdLen);
                 MessageExt.socketAddress2ByteBuffer(msgInner.getStoreHost(), msgIdBuffer);
-                msgIdBuffer.clear();//because socketAddress2ByteBuffer flip the buffer
+                msgIdBuffer.clear(); //because socketAddress2ByteBuffer flip the buffer
                 msgIdBuffer.putLong(msgIdLen - 8, wroteOffset);
                 return UtilAll.bytes2string(msgIdBuffer.array());
             };

@@ -43,6 +43,12 @@ import org.apache.rocketmq.store.config.MessageStoreConfig;
 import org.apache.rocketmq.store.util.LibC;
 import sun.nio.ch.DirectBuffer;
 
+/**
+ * 同步刷盘:
+ * 数据先写入 ByteBuffer，由 CommitRealTime 线程定时 200ms 提交到 fileChannel 内存，再由 FlushRealTime 线程定时 500ms 刷 fileChannel 落盘
+ * 异步刷盘:
+ * 直接将数据写入到 MappedByteBuffer
+ */
 public class MappedFile extends ReferenceResource {
 
     protected static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
@@ -63,17 +69,19 @@ public class MappedFile extends ReferenceResource {
     private static final AtomicInteger TOTAL_MAPPED_FILES = new AtomicInteger(0);
 
     /**
-     * 当前 MappedFile 对象当前写指针
+     * 当前 MappedFile 对象当前写指针, 下次写数据从此开始写入
      */
     protected final AtomicInteger wrotePosition = new AtomicInteger(0);
 
     /**
      * 当前 MappedFile 对象提交的指针
+     * 指针之前的数据已提交到 fileChannel, committedPosition 到 wrotePosition 之间的数据是还未提交到 fileChannel 的
      */
     protected final AtomicInteger committedPosition = new AtomicInteger(0);
 
     /**
      * 当前 MappedFile 对象刷写到磁盘的指针
+     * 指针之前的数据已落盘, committedPosition 到 flushedPosition 之间的数据是还未落盘的
      */
     private final AtomicInteger flushedPosition = new AtomicInteger(0);
 
@@ -86,21 +94,22 @@ public class MappedFile extends ReferenceResource {
      * 文件通道
      */
     protected FileChannel fileChannel;
-    /**
-     * Message will put to here first, and then rePut to FileChannel if writeBuffer is not null.
-     *
-     * 开启了 transientStorePoolEnable, 消息会写入堆外内存，然后提交到 PageCache 并最终刷写到磁盘
-     * 主要是利用率 NIO 的内存映射机制
-     */
-    protected ByteBuffer writeBuffer = null;
 
     /**
-     * ByteBuffer 缓冲池
-     * 一个 ByteBuffer 就是一个 CommitLog 文件
+     * NIO 内存映射技术:
+     * 将文件系统中的文件映射到内存中, 实现对文件的操作转换对内存地址的操作 (这个内存对象, 在代码里面就是 ByteBuffer)
+     * 可以看 TransientStorePool 类的 init 方法, 里面有跟详细说明
      *
-     * 开启了 transientStorePoolEnable, 这个对象才有值, 将最近的 5 个 CommitLog 加载到内存中
+     * ByteBuffer 缓冲池, 将最近的 5 个 CommitLog 加载到这个缓冲池中, 一个 CommitLog 文件就是一个 ByteBuffer
+     *
+     * 开启了 transientStorePoolEnable, 同时主节点 + 异步刷盘, 这个对象才有值,
      */
     protected TransientStorePool transientStorePool = null;
+
+    /**
+     * transientStorePool 池中的第一个 ByteBuffer 对象
+     */
+    protected ByteBuffer writeBuffer = null;
 
     /**
      * 文件名称
@@ -108,7 +117,11 @@ public class MappedFile extends ReferenceResource {
     private String fileName;
 
     /**
-     * 文件序号, 代表该文件的文件偏移量
+     * 当前文件起始的写入字节数
+     *
+     * RocketMQ 的设计:
+     * 一个文件的名字就是当前文件存储的第一条消息的偏移量,
+     * 通过这个偏移量 + 一个文件大小, 就可以获取到下一个文件的名字
      */
     private long fileFromOffset;
 
@@ -118,12 +131,12 @@ public class MappedFile extends ReferenceResource {
     private File file;
 
     /**
-     * 对应操作系统的 PageCache
+     * 实际就是操作系统的 PageCache (文件内容加载到内存中的对象)
      */
     private MappedByteBuffer mappedByteBuffer;
 
     /**
-     * 最后一次存储时间戳
+     * 最近一次存储时间戳
      */
     private volatile long storeTimestamp = 0;
 
@@ -238,9 +251,11 @@ public class MappedFile extends ReferenceResource {
         try {
             // 文件通道
             this.fileChannel = new RandomAccessFile(this.file, "rw").getChannel();
-            // 文件通道对应的 字节缓冲
+            // 通过 FileChannel 创建 MappedByteBuffer, 将文件映射到内存中, 也就是使用 mmap 技术
             this.mappedByteBuffer = this.fileChannel.map(MapMode.READ_WRITE, 0, fileSize);
+            // 全局记录用了多少文件映射内存
             TOTAL_MAPPED_VIRTUAL_MEMORY.addAndGet(fileSize);
+            // 全局记录文件映射内存的文件个数
             TOTAL_MAPPED_FILES.incrementAndGet();
             ok = true;
         } catch (FileNotFoundException e) {
@@ -268,28 +283,53 @@ public class MappedFile extends ReferenceResource {
         return fileChannel;
     }
 
+    /**
+     * 向 MappedFile 中追加单条消息
+     * @param msg 消息
+     * @param cb 具体文件对象的写入消息实现函数
+     * @param putMessageContext 上下文
+     * @return 追加结果
+     */
     public AppendMessageResult appendMessage(final MessageExtBrokerInner msg, final AppendMessageCallback cb,
             PutMessageContext putMessageContext) {
         return appendMessagesInner(msg, cb, putMessageContext);
     }
 
+    /**
+     * 向 MappedFile 中追加批量消息
+     * @param messageExtBatch 批量消息
+     * @param cb 具体文件对象的写入消息实现函数
+     * @param putMessageContext 上下文
+     * @return 追加结果
+     */
     public AppendMessageResult appendMessages(final MessageExtBatch messageExtBatch, final AppendMessageCallback cb,
             PutMessageContext putMessageContext) {
         return appendMessagesInner(messageExtBatch, cb, putMessageContext);
     }
 
+    /**
+     * 向 MappedFile 中追加消息
+     * @param messageExt 消息
+     * @param cb 具体文件对象的写入消息实现函数
+     * @param putMessageContext 上下文
+     * @return 追加结果
+     */
     public AppendMessageResult appendMessagesInner(final MessageExt messageExt, final AppendMessageCallback cb,
             PutMessageContext putMessageContext) {
         assert messageExt != null;
         assert cb != null;
         // 当前文件写入的指针
         int currentPos = this.wrotePosition.get();
-        // 写入的指针位置还没达到文件的大小
+        // 写入的指针位置还没达到文件的大小, 即文件还有空间可以写入
+        // 一般来说在写入过程中会控制文件剩余空间不够本次写入数据, 会自动创建新文件继续写入, 所以这里的写入位置应该永远小于文件末尾位置才对
         if (currentPos < this.fileSize) {
+            // 获取当前写入的 ByteBuffer 对象, 如果开启了 transientStorePoolEnable + 主节点 + 异步刷盘, 那么就是从池中获取的 ByteBuffer 对象, 否则就是 MappedByteBuffer
+            // ByteBuffer.slice() 方法创建一个新的 ByteBuffer 对象, 与原始 ByteBuffer 共享数据元素, 但是会重置自己的 pos, lim, mark 属性 (可以简单的看出是拷贝了一个新的对象)
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
             byteBuffer.position(currentPos);
             AppendMessageResult result;
             if (messageExt instanceof MessageExtBrokerInner) {
+                // AppendMessageCallback 现在只有一个实现 DefaultAppendMessageCallback
                 result = cb.doAppend(this.getFileFromOffset(), byteBuffer, this.fileSize - currentPos,
                         (MessageExtBrokerInner) messageExt, putMessageContext);
             } else if (messageExt instanceof MessageExtBatch) {

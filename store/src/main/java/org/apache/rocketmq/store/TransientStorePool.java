@@ -62,11 +62,13 @@ public class TransientStorePool {
      * It's a heavy init method.
      */
     public void init() {
+
+        // 初始化池, 提前申请 poolSize 个 ByteBuffer, 并将他们锁住, 保证不会被交换到交换内存
         for (int i = 0; i < poolSize; i++) {
             ByteBuffer byteBuffer = ByteBuffer.allocateDirect(fileSize);
 
             // Java NIO 的内存映射机制，提供了将文件系统中的文件映射到内存机制，实现对文件的操作转换对内存地址的操作，极大的提高了 IO 特性，
-            // 但这部分内存并不是常驻内存，可以被置换到交换内存(虚拟内存)，RocketMQ 为了提高消息发送的性能，引入了内存锁定机制，
+            // 但这部分内存并不是常驻内存，可以被置换到交换内存 (虚拟内存)，RocketMQ 为了提高消息发送的性能，引入了内存锁定机制，
             // 即将最近需要操作的 CommitLog 文件映射到内存，并提供内存锁定功能，确保这些文件始终存在内存中
 
             // 交换内存是一种虚拟内存的管理方式，它使得操作系统可以将一部分硬盘空间模拟成内存使用,
