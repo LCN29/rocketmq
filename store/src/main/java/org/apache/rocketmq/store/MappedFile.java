@@ -397,13 +397,16 @@ public class MappedFile extends ReferenceResource {
      * @return The current flushed position
      */
     public int flush(final int flushLeastPages) {
+
+        // 这里回去计算当前内存累计的脏页是否到了最低脏页刷盘的阈值
         if (this.isAbleToFlush(flushLeastPages)) {
+            // 检查当前 mapFile 没有被销毁，destroy 函数会将 refCount 置为 0，hold 同时会将 refCount++ 代表此时有至少一个线程在反问 mapFile
             if (this.hold()) {
                 // 获取最新的位置, 写位置或者提交位置, 由是否开启了 nio 虚拟内存决定
                 int value = getReadPosition();
 
                 try {
-                    //We only append data to fileChannel or mappedByteBuffer, never both.
+                    // We only append data to fileChannel or mappedByteBuffer, never both.
                     if (writeBuffer != null || this.fileChannel.position() != 0) {
                         this.fileChannel.force(false);
                     } else {
@@ -614,12 +617,27 @@ public class MappedFile extends ReferenceResource {
         this.committedPosition.set(pos);
     }
 
+    /**
+     * 文件预热, 简单理解就是在文件的每 4K (也就是一页) 处写入一个 0, 提前预热整个文件
+     * 一个文件的预热的时间是一个比较耗时的过程, 但是预热后的文件的写入性能更好
+     *
+     * 例子
+     * 向一个没有预热的文件写入 1G 的数据, 可能需要 300ms
+     * 但是如果预热后, 再写入 1G 的数据, 可能只需要 270ms, 但是前面需要花 100ms 的时间去预热
+     *
+     * @param type
+     * @param pages
+     */
     public void warmMappedFile(FlushDiskType type, int pages) {
         long beginTime = System.currentTimeMillis();
         ByteBuffer byteBuffer = this.mappedByteBuffer.slice();
         int flush = 0;
         long time = System.currentTimeMillis();
         for (int i = 0, j = 0; i < this.fileSize; i += MappedFile.OS_PAGE_SIZE, j++) {
+            // OS_PAGE_SIZE = 1024 * 4
+            // 简单理解就是在文件的每 4K (也就是一页) 处写入一个 0
+            // 原理: mmap 只是将磁盘文件映射到程序的虚拟内存地址中, 并没有分配真正的物理内存页,
+            // 提前写入一个 0, 强制分配一个物理内存页, 也就是预热
             byteBuffer.put(i, (byte) 0);
             // force flush when flush disk type is sync
             if (type == FlushDiskType.SYNC_FLUSH) {
@@ -677,6 +695,9 @@ public class MappedFile extends ReferenceResource {
         this.firstCreateInQueue = firstCreateInQueue;
     }
 
+    /**
+     * 文件加锁
+     */
     public void mlock() {
         final long beginTime = System.currentTimeMillis();
         final long address = ((DirectBuffer) (this.mappedByteBuffer)).address();
@@ -692,6 +713,9 @@ public class MappedFile extends ReferenceResource {
         }
     }
 
+    /**
+     * 文件解锁
+     */
     public void munlock() {
         final long beginTime = System.currentTimeMillis();
         final long address = ((DirectBuffer) (this.mappedByteBuffer)).address();
