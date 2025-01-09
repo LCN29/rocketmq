@@ -108,6 +108,7 @@ public class MessageStoreConfig {
      * MQ body 的最大大小, 只包含消息体, 不包含其他, 默认值为 4M
      */
     private int maxMessageSize = 1024 * 1024 * 4;
+
     // Whether check the CRC32 of the records consumed.
     // This ensures no on-the-wire or on-disk corruption to the messages occurred.
     // This check adds some overhead,so it may be disabled in cases seeking extreme performance.
@@ -183,6 +184,7 @@ public class MessageStoreConfig {
     private long flushDelayOffsetInterval = 1000 * 10;
     @ImportantField
     private boolean cleanFileForciblyEnable = true;
+    // 文件预热功能
     private boolean warmMapedFileEnable = false;
     private boolean offsetCheckInSlave = false;
     private boolean debugLockEnable = false;
@@ -697,6 +699,8 @@ public class MessageStoreConfig {
     /**
      * Enable transient commitLog store pool only if transientStorePoolEnable is true and the FlushDiskType is
      * ASYNC_FLUSH
+     *
+     * transientStorePoolEnable 配置为 true + FlushDiskType 为 ASYNC_FLUSH + 主节点 时, 才启用 TransientStorePool
      *
      * @return <tt>true</tt> or <tt>false</tt>
      */

@@ -76,7 +76,10 @@ public class Producer {
                 /*
                  * Call send message to deliver message to one of brokers.
                  */
+                // 获取发送结果
                 SendResult sendResult = producer.send(msg);
+                // producer.sendOneway(msg);
+
                 /*
                  * There are different ways to send message, if you don't care about the send result,you can use this way
                  * {@code
@@ -111,7 +114,7 @@ public class Producer {
                  *}
                  */
 
-                System.out.printf("%s%n", sendResult);
+             //   System.out.printf("%s%n", sendResult);
             } catch (Exception e) {
                 e.printStackTrace();
                 Thread.sleep(1000);

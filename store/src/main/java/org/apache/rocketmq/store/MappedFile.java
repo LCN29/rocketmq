@@ -233,6 +233,7 @@ public class MappedFile extends ReferenceResource {
 
     public void init(final String fileName, final int fileSize, final TransientStorePool transientStorePool) throws IOException {
         init(fileName, fileSize);
+        // transientStorePoolEnable 配置为 true + FlushDiskType 为 ASYNC_FLUSH + 主节点 时, 才启用 TransientStorePool
         this.writeBuffer = transientStorePool.borrowBuffer();
         this.transientStorePool = transientStorePool;
     }
@@ -432,7 +433,6 @@ public class MappedFile extends ReferenceResource {
     }
 
     /**
-     *
      * @param commitLeastPages
      * @return
      */

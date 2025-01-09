@@ -182,6 +182,7 @@ public class DefaultMessageStore implements MessageStore {
         this.storeStatsService = new StoreStatsService();
         // IndexFile 索引文件服务
         this.indexService = new IndexService(this);
+
         // 高可用服务, 默认为 null
         if (!messageStoreConfig.isEnableDLegerCommitLog()) {
             this.haService = new HAService(this);
@@ -209,6 +210,7 @@ public class DefaultMessageStore implements MessageStore {
         this.dispatcherList.addLast(new CommitLogDispatcherBuildConsumeQueue());
         // 通知 IndexFile 的 Dispatcher, 可用于更新 IndexFile 的索引信息
         this.dispatcherList.addLast(new CommitLogDispatcherBuildIndex());
+
         // 获取锁文件，路径就是配置的 {storePathRootDir}/lock
         File file = new File(StorePathConfigHelper.getLockFile(messageStoreConfig.getStorePathRootDir()));
         // 确保创建 file 文件的父目录, 即 {storePathRootDir} 目录
@@ -541,6 +543,7 @@ public class DefaultMessageStore implements MessageStore {
 
         return putResultFuture;
     }
+
     public CompletableFuture<PutMessageResult> asyncPutMessages(MessageExtBatch messageExtBatch) {
         PutMessageStatus checkStoreStatus = this.checkStoreStatus();
         if (checkStoreStatus != PutMessageStatus.PUT_OK) {
