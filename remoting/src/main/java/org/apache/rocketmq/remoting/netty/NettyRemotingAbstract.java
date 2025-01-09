@@ -207,6 +207,7 @@ public abstract class NettyRemotingAbstract {
                             @Override
                             public void callback(RemotingCommand response) {
                                 doAfterRpcHooks(remoteAddr, cmd, response);
+                                // cmd 是否需要响应结果
                                 if (!cmd.isOnewayRPC()) {
                                     if (response != null) {
                                         response.setOpaque(opaque);
