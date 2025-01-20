@@ -83,6 +83,7 @@ public class MessageStoreConfig {
      */
     @ImportantField
     private boolean flushCommitLogTimed = true;
+
     // ConsumeQueue flush interval
     private int flushIntervalConsumeQueue = 1000;
     // Resource reclaim interval

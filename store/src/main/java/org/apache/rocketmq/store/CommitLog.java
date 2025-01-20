@@ -721,7 +721,7 @@ public class CommitLog {
         // Back to Results
         // 消息写入缓冲区结果
         AppendMessageResult result = null;
-        // 可重入锁
+        // 自旋锁或可重入锁
         putMessageLock.lock(); //spin or ReentrantLock ,depending on store config
         try {
             // 获取最新的 MappedFile 对象
@@ -1176,11 +1176,11 @@ public class CommitLog {
 
                 // 是否开启了定时刷盘
                 boolean flushCommitLogTimed = CommitLog.this.defaultMessageStore.getMessageStoreConfig().isFlushCommitLogTimed();
-                // 刷新数据到磁盘的间隔
+                // 刷新数据到磁盘的间隔 500ms
                 int interval = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushIntervalCommitLog();
                 // 每次刷盘的页数
                 int flushPhysicQueueLeastPages = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogLeastPages();
-                // 2 次刷盘的事件间隔
+                // 2 次刷盘的时间间隔最大相隔时间 1000 * 10ms
                 int flushPhysicQueueThoroughInterval =
                     CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogThoroughInterval();
 
@@ -1208,6 +1208,9 @@ public class CommitLog {
                     }
 
                     long begin = System.currentTimeMillis();
+                    // 内部逻辑, 未落盘数据不足 flushPhysicQueueLeastPages 页, 则不会执行刷盘操作
+                    // flushPhysicQueueLeastPages 默认为 4, 但是当 2 次强制刷盘的时间间隔超过了 flushPhysicQueueThoroughInterval 时, 会设置为 0, 强制刷盘
+                    // 分析 lastFlushTimestamp 变量的逻辑
                     CommitLog.this.mappedFileQueue.flush(flushPhysicQueueLeastPages);
 
                     // 更新 checkPoint 的 commitLog 最新消息的写入时间
