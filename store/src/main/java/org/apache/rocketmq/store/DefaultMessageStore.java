@@ -300,9 +300,11 @@ public class DefaultMessageStore implements MessageStore {
              * 3. Calculate the reput offset according to the consume queue;
              * 4. Make sure the fall-behind messages to be dispatched before starting the commitlog, especially when the broker role are automatically changed.
              */
+            // 默认为最新的 commitLog 文件文件名 (文件名就是当前文件的最大偏移量)
             long maxPhysicalPosInLogicQueue = commitLog.getMinOffset();
             for (ConcurrentMap<Integer, ConsumeQueue> maps : this.consumeQueueTable.values()) {
                 for (ConsumeQueue logic : maps.values()) {
+                    // 获取 ConsumeQueue 文件的最大偏移量, 如果大于 maxPhysicalPosInLogicQueue, 则更新 maxPhysicalPosInLogicQueue
                     if (logic.getMaxPhysicOffset() > maxPhysicalPosInLogicQueue) {
                         maxPhysicalPosInLogicQueue = logic.getMaxPhysicOffset();
                     }
@@ -1587,6 +1589,7 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     public void doDispatch(DispatchRequest req) {
+        // 默认有 2 个 CommitLogDispatcherBuildConsumeQueue 和 CommitLogDispatcherBuildIndex
         for (CommitLogDispatcher dispatcher : this.dispatcherList) {
             dispatcher.dispatch(req);
         }
@@ -2102,17 +2105,17 @@ public class DefaultMessageStore implements MessageStore {
 
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
 
-                            // 生成 DispatchRequest 对象
+                            // 生成 DispatchRequest 对象 (封装了消息的 Topic, QueueId 等信息)
                             DispatchRequest dispatchRequest =
                                 DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
                             int size = dispatchRequest.getBufferSize() == -1 ? dispatchRequest.getMsgSize() : dispatchRequest.getBufferSize();
 
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
-                                    // 根据 commitLog 文件内容实时构建 consumeQueue、index文件的关键所在
+                                    // 根据 commitLog 文件内容实时构建 consumeQueue、index 文件的关键所在
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
-                                    // 开启了长轮询并且角色为主节点，则通知有新消息到达，执行一次 pullRequest 验证
+                                    // 开启了长轮询并且角色为主节点，则通知有新消息到达，执行一次 pullRequest 验证，重新处理消息拉取请求
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
                                             && DefaultMessageStore.this.brokerConfig.isLongPollingEnable()
                                             && DefaultMessageStore.this.messageArrivingListener != null) {
@@ -2127,6 +2130,7 @@ public class DefaultMessageStore implements MessageStore {
 
                                     this.reputFromOffset += size;
                                     readSize += size;
+                                    // 如果是从节点, 则更新统计信息
                                     if (DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole() == BrokerRole.SLAVE) {
                                         DefaultMessageStore.this.storeStatsService
                                             .getSinglePutMessageTopicTimesTotal(dispatchRequest.getTopic()).add(1);
