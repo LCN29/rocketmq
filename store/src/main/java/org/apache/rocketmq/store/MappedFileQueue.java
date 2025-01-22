@@ -171,6 +171,7 @@ public class MappedFileQueue {
                 MappedFile mappedFile = new MappedFile(file.getPath(), mappedFileSize);
                 // 这里先直接将所有指针设置为文件大小
                 // 后面在 org.apache.rocketmq.store.CommitLog.recoverNormally 中进行文件完整判断, 然后进行修改为正确的值
+                // 本质就是更加消费队列的消费位点更新最新的进度
                 mappedFile.setWrotePosition(this.mappedFileSize);
                 mappedFile.setFlushedPosition(this.mappedFileSize);
                 mappedFile.setCommittedPosition(this.mappedFileSize);

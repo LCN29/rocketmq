@@ -130,6 +130,7 @@ public class ConsumerGroupInfo {
         this.consumeFromWhere = consumeFromWhere;
 
         ClientChannelInfo infoOld = this.channelInfoTable.get(infoNew.getChannel());
+        // 如果缓存中的连接信息为 null, 说明当前连接是一个新连接
         if (null == infoOld) {
             ClientChannelInfo prev = this.channelInfoTable.put(infoNew.getChannel(), infoNew);
             if (null == prev) {
@@ -157,7 +158,7 @@ public class ConsumerGroupInfo {
 
     public boolean updateSubscription(final Set<SubscriptionData> subList) {
         boolean updated = false;
-
+        // 遍历订阅信息
         for (SubscriptionData sub : subList) {
             SubscriptionData old = this.subscriptionTable.get(sub.getTopic());
             if (old == null) {
@@ -181,6 +182,7 @@ public class ConsumerGroupInfo {
             }
         }
 
+        // 判断订阅信息是否变更了
         Iterator<Entry<String, SubscriptionData>> it = this.subscriptionTable.entrySet().iterator();
         while (it.hasNext()) {
             Entry<String, SubscriptionData> next = it.next();

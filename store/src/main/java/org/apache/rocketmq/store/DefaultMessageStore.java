@@ -1530,6 +1530,7 @@ public class DefaultMessageStore implements MessageStore {
     private long recoverConsumeQueue() {
         long maxPhysicOffset = -1;
         for (ConcurrentMap<Integer, ConsumeQueue> maps : this.consumeQueueTable.values()) {
+            // 同一个 Topic 下的多个 队列, 取最大的 maxPhysicOffset
             for (ConsumeQueue logic : maps.values()) {
                 logic.recover();
                 if (logic.getMaxPhysicOffset() > maxPhysicOffset) {

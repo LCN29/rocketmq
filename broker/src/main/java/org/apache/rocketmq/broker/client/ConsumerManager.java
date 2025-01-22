@@ -112,17 +112,20 @@ public class ConsumerManager {
             consumerGroupInfo = prev != null ? prev : tmp;
         }
 
+        // 更新连接
         boolean r1 =
             consumerGroupInfo.updateChannel(clientChannelInfo, consumeType, messageModel,
                 consumeFromWhere);
+        // 更新订阅信息
         boolean r2 = consumerGroupInfo.updateSubscription(subList);
 
         if (r1 || r2) {
+            // 如果连接或者订阅信息有更新，并且允许通知，那么通知该 consumer group 中的所有 consumer 进行重平衡
             if (isNotifyConsumerIdsChangedEnable) {
                 this.consumerIdsChangeListener.handle(ConsumerGroupEvent.CHANGE, group, consumerGroupInfo.getAllChannel());
             }
         }
-
+        // 注册订阅信息到ConsumerFilterManager
         this.consumerIdsChangeListener.handle(ConsumerGroupEvent.REGISTER, group, subList);
 
         return r1 || r2;

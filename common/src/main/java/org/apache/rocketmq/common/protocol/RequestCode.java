@@ -66,6 +66,9 @@ public class RequestCode {
      */
     public static final int HEART_BEAT = 34;
 
+    /**
+     * 注销客户端
+     */
     public static final int UNREGISTER_CLIENT = 35;
 
     /**
