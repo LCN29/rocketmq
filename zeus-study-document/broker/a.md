@@ -90,15 +90,43 @@ A mapping, once established, is not dependent upon the file channel that was use
 ### FileChannel.write
 
 FileChannel 可以看作是一个开辟了一个通道, 在 Java 应用和文件系统之间建立了一个连接, 通过这个通道对文件进行读写。
+图示
 
-FileChannel.write(ByteBuffer) 方法, 本质是调用了底层的 vfs_write 系统调用, 将数据写入到 Page Cache。
+FileChannel.write(ByteBuffer) 方法, 本质是调用了底层的 vfs_write 函数, 将内存中的数据写入到 Page Cache。
+图示
+
+数据加载到 PageCache 所以
+FileChannel.write(ByteBuffer) 的过程如下
+> 1. 应用从用户态切换到内核态
+> 2. 将 ByteBuffer 中的数据拷贝到 Page Cache 中 (CPU 拷贝), 因为这个 Page Cache 修改了, 就会变为脏页 (dirty page)
+> 3. 从内核态切换到用户态
+> 4. 后续操作系统会将变为脏页的 Page Cache 中的数据写入磁盘 (DMA 拷贝)
+
+这个过程中, 跟用户进程耗时比较大的操作, 主要涉及到 2 次上下文切换 + 1 次 CPU 拷贝, DMA 拷贝由操作系统决定, 不考虑
 
 ### MappedByteBuffer.put
 
 MappedByteBuffer 可以看作是一个内存区域, 会将文件的一部分内容(取决于声明 MappedByteBuffer 时的大小)映射到这个内存区域,
 对这个内存区域的操作, 间接操作映射到这个区域的文件内容。
 
-MappedByteBuffer 的创建, 本身是需要使用到底层的 mmap 系统调用的, 而 mmap 系统调用的实现如下
+MappedByteBuffer 的创建, 本身是需要使用到底层的 mmap 函数, 而 mmap 系统调用的实现如下
+调用 mmap 函数, 会在进程的地址空间中开辟一段虚拟内存, 和文件的对应内容建立映射关系, 这是 mmap 函数就结束了
+但是对文件直接的操作, 是一个很慢的操作, 所以, 在对数据的读写操作时, 实际上还是对 Page Cache 的读写操作，
+所以操作系统中, 有一个叫做**进程页表**的设计, 可以看作一个虚拟内存和 Page Cache 的映射关系。
+
+MappedByteBuffer.put 的过程如下
+> 1. 将 ByteBuffer 中的数据写入到 MappedByteBuffer 时, 实际就是直接写入到 Page Cache, 同样会变为脏页
+> 2. 后续操作系统会将脏页的 Page Cache 中的数据写入磁盘 (DMA 拷贝)
+
+读写 MappedByteBuffer 本质上就是读写内核态的 Page Cache, 因此没有上下文切换，也没有拷贝 (DMA 拷贝不考虑)。
+
+看起来 MappedByteBuffer 几乎没有任何开销, 但是因为 mmap 的设计, 需要**进程页表**, 会有别的开销点
+> 缺页中断, 建立 Page Cache 和虚拟内存的映射关系
+> 在实际访问内存的过程中会遇到页表竞争以及 TLB shootdown 等问题
+
+所以向通过 mmap 获取到的虚拟内存, 读写数据时
+> 1. 通过虚拟地址到进程页表中查找对应的 Page Cache, 找到就返回数据或者写入数据
+> 2. 如果没有找到, 会触发缺页中断 (page fault), 从磁盘加载数据到 Page Cache 中, 修改进程页表完成映射, 再返回数据或者写入数据
 
 ## 参考
 
