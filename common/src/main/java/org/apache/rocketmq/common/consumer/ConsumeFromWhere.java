@@ -19,7 +19,7 @@ package org.apache.rocketmq.common.consumer;
 public enum ConsumeFromWhere {
 
     /**
-     * 从最新的偏移位置开始消费
+     * 消费者组第一次启动时从最后的位置消费，后续再启动接着上次消费的进度开始消费
      */
     CONSUME_FROM_LAST_OFFSET,
 
@@ -31,7 +31,7 @@ public enum ConsumeFromWhere {
     CONSUME_FROM_MAX_OFFSET,
 
     /**
-     * 从依旧保存的消息的最早的偏移位置开始消费
+     * 消费者组第一次启动时从最开始的位置消费，后续再启动接着上次消费的进度开始消费 (默认消息会在 Broker 中保存一段时间)
      */
     CONSUME_FROM_FIRST_OFFSET,
 

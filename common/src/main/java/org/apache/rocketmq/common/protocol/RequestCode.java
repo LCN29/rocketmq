@@ -30,7 +30,15 @@ public class RequestCode {
 
     public static final int QUERY_MESSAGE = 12;
     public static final int QUERY_BROKER_OFFSET = 13;
+
+    /**
+     * Consumer 从 Broker 查询消费进度
+     */
     public static final int QUERY_CONSUMER_OFFSET = 14;
+
+    /**
+     * Consumer 更新消费进度
+     */
     public static final int UPDATE_CONSUMER_OFFSET = 15;
 
     /**
@@ -95,6 +103,10 @@ public class RequestCode {
 
     public static final int LOCK_BATCH_MQ = 41;
 
+    /**
+     * Consumer 解锁消息队列
+     * Push 模式下且当前消费者是有序消费时, 会所队列
+     */
     public static final int UNLOCK_BATCH_MQ = 42;
     public static final int GET_ALL_CONSUMER_OFFSET = 43;
 

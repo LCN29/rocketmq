@@ -352,7 +352,7 @@ public abstract class RebalanceImpl {
         final boolean isOrder) {
         boolean changed = false;
 
-        // 获取当前消费者维护的队列处理关心
+        // 获取当前消费者处理的队列关系 Map<队列, 队列处理信息> 队列处理信息(消费到了哪个位点等)
         Iterator<Entry<MessageQueue, ProcessQueue>> it = this.processQueueTable.entrySet().iterator();
         while (it.hasNext()) {
             Entry<MessageQueue, ProcessQueue> next = it.next();
