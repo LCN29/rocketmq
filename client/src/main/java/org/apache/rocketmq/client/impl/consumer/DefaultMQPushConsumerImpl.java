@@ -220,6 +220,10 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         this.offsetStore = offsetStore;
     }
 
+    /**
+     * 获取消费消息
+     * @param pullRequest
+     */
     public void pullMessage(final PullRequest pullRequest) {
         // 从请求中获取对应的处理队列
         final ProcessQueue processQueue = pullRequest.getProcessQueue();

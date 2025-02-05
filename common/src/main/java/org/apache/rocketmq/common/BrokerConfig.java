@@ -153,6 +153,8 @@ public class BrokerConfig {
     // whether do filter when retry.
     // 消息重试时, 是否支持按照条件进行过滤
     private boolean filterSupportRetry = false;
+
+    // 是否启用属性过滤, 也就是 SQL92 过滤
     private boolean enablePropertyFilter = false;
 
     private boolean compressedRegister = false;

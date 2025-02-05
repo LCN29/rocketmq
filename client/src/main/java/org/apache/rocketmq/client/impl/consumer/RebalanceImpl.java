@@ -278,6 +278,7 @@ public abstract class RebalanceImpl {
             case CLUSTERING: {
                 // 获取当前 Topic 在 NameServer 下所有的消息队列
                 Set<MessageQueue> mqSet = this.topicSubscribeInfoTable.get(topic);
+                // 获取当前消费者组下所有的消费者 ID
                 List<String> cidAll = this.mQClientFactory.findConsumerIdList(topic, consumerGroup);
                 if (null == mqSet) {
                     if (!topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
@@ -292,7 +293,7 @@ public abstract class RebalanceImpl {
                 if (mqSet != null && cidAll != null) {
                     List<MessageQueue> mqAll = new ArrayList<MessageQueue>();
                     mqAll.addAll(mqSet);
-
+                    // 对 队列和消费者 ID 进行排序, 保证所有的消费客户端都一致
                     Collections.sort(mqAll);
                     Collections.sort(cidAll);
 
@@ -300,7 +301,7 @@ public abstract class RebalanceImpl {
 
                     List<MessageQueue> allocateResult = null;
                     try {
-                        // 为当前的消费端分配消息队列
+                        // 根据分配策略, 为当前的消费端分配消息队列
                         allocateResult = strategy.allocate(
                             this.consumerGroup,
                             this.mQClientFactory.getClientId(),
@@ -317,6 +318,9 @@ public abstract class RebalanceImpl {
                         allocateResultSet.addAll(allocateResult);
                     }
 
+                    /**
+                     * 更新新分配的消息队列的处理队列processQueueTable的信息，创建最初的pullRequest并分发给PullMessageService
+                     */
                     boolean changed = this.updateProcessQueueTableInRebalance(topic, allocateResultSet, isOrder);
                     if (changed) {
                         log.info(
