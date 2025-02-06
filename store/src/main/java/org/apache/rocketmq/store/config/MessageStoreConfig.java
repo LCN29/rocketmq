@@ -45,7 +45,8 @@ public class MessageStoreConfig {
      *  CommitLog 文件大小, 默认为 1G
      */
     private int mappedFileSizeCommitLog = 1024 * 1024 * 1024;
-    // ConsumeQueue file size,default is 30W
+    // ConsumeQueue file size, default is 30W
+    // 默认 30w 条数据, 每条 20 B, 所以一个 consumeQueue 大约 6M 大小
     private int mappedFileSizeConsumeQueue = 300000 * ConsumeQueue.CQ_STORE_UNIT_SIZE;
     // enable consume queue ext
     private boolean enableConsumeQueueExt = false;

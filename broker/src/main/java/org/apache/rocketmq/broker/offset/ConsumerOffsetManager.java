@@ -37,6 +37,7 @@ public class ConsumerOffsetManager extends ConfigManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     protected static final String TOPIC_GROUP_SEPARATOR = "@";
 
+    // key1: topic@group, key2: 队列 id, value: 消费端提交的消费到哪里的偏移量
     protected ConcurrentMap<String/* topic@group */, ConcurrentMap<Integer, Long>> offsetTable =
         new ConcurrentHashMap<String, ConcurrentMap<Integer, Long>>(512);
 

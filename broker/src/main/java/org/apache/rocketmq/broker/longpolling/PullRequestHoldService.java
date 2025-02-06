@@ -71,7 +71,7 @@ public class PullRequestHoldService extends ServiceThread {
         log.info("{} service started", this.getServiceName());
         while (!this.isStopped()) {
             try {
-                // 进行挂起, 支持长轮训挂起时间 5s, 否则就是配置的短轮询时间
+                // 进行挂起, 支持长轮训挂起时间 5s, 否则就是配置的短轮询时间 1s
                 if (this.brokerController.getBrokerConfig().isLongPollingEnable()) {
                     this.waitForRunning(5 * 1000);
                 } else {
