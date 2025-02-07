@@ -383,10 +383,13 @@ public class ConsumeQueue {
     }
 
     public void putMessagePositionInfoWrapper(DispatchRequest request, boolean multiQueue) {
+        // 最多重试 30 次
         final int maxRetries = 30;
+        // 判断当前的文件存储是否可以写入
         boolean canWrite = this.defaultMessageStore.getRunningFlags().isCQWriteable();
         for (int i = 0; i < maxRetries && canWrite; i++) {
             long tagsCode = request.getTagsCode();
+            // 如果支持扩展信息写入，默认 false
             if (isExtWriteEnable()) {
                 ConsumeQueueExt.CqExtUnit cqExtUnit = new ConsumeQueueExt.CqExtUnit();
                 cqExtUnit.setFilterBitMap(request.getBitMap());
@@ -401,11 +404,14 @@ public class ConsumeQueue {
                         topic, queueId, request.getCommitLogOffset());
                 }
             }
+            // 写入消息位置信息到 ConsumeQueue 中
             boolean result = this.putMessagePositionInfo(request.getCommitLogOffset(),
                 request.getMsgSize(), tagsCode, request.getConsumeQueueOffset());
             if (result) {
+                // 从节点 或者 开启了 DLeger CommitLog (默认为 false)
                 if (this.defaultMessageStore.getMessageStoreConfig().getBrokerRole() == BrokerRole.SLAVE ||
                     this.defaultMessageStore.getMessageStoreConfig().isEnableDLegerCommitLog()) {
+                    // 修改 StoreCheckpoint 中的 physicMsgTimestamp 为最新 commitLog 文件的刷盘时间戳, 单位毫秒
                     this.defaultMessageStore.getStoreCheckpoint().setPhysicMsgTimestamp(request.getStoreTimestamp());
                 }
                 this.defaultMessageStore.getStoreCheckpoint().setLogicsMsgTimestamp(request.getStoreTimestamp());
@@ -479,6 +485,8 @@ public class ConsumeQueue {
     private boolean putMessagePositionInfo(final long offset, final int size, final long tagsCode,
         final long cqOffset) {
 
+        // 如果 消息偏移量+消息大小 小于等于 ConsumeQueue 已处理的最大物理偏移量
+        // 说明该消息已经被写过了，直接返回 true
         if (offset + size <= this.maxPhysicOffset) {
             log.warn("Maybe try to build consume queue repeatedly maxPhysicOffset={} phyOffset={}", maxPhysicOffset, offset);
             return true;
@@ -494,19 +502,24 @@ public class ConsumeQueue {
 
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile(expectLogicOffset);
         if (mappedFile != null) {
-
+            // 如果 mappedFile 是第一个创建的消费队列，并且消息在消费队列的偏移量不为 0，并且消费队列写入指针为 0
+            // 那么表示消费索引数据错误，需要重设索引信息
             if (mappedFile.isFirstCreateInQueue() && cqOffset != 0 && mappedFile.getWrotePosition() == 0) {
+                // 设置最小偏移量为预计偏移量
                 this.minLogicOffset = expectLogicOffset;
+                // 设置刷盘最新位置，提交的最新位置
                 this.mappedFileQueue.setFlushedWhere(expectLogicOffset);
                 this.mappedFileQueue.setCommittedWhere(expectLogicOffset);
+                // 对该 ConsumeQueue 文件 expectLogicOffset 之前的位置填充前导 0
                 this.fillPreBlank(mappedFile, expectLogicOffset);
                 log.info("fill pre blank space " + mappedFile.getFileName() + " " + expectLogicOffset + " "
                     + mappedFile.getWrotePosition());
             }
-
+            // 如果消息在消费队列的偏移量不为 0, 即此前有数据
             if (cqOffset != 0) {
+                // 获取当前 ConsumeQueue 文件最新已写入物理偏移量
                 long currentLogicOffset = mappedFile.getWrotePosition() + mappedFile.getFileFromOffset();
-
+                // 最新已写入物理偏移量大于预期偏移量，那么表示重复构建消费队列
                 if (expectLogicOffset < currentLogicOffset) {
                     log.warn("Build  consume queue repeatedly, expectLogicOffset: {} currentLogicOffset: {} Topic: {} QID: {} Diff: {}",
                         expectLogicOffset, currentLogicOffset, this.topic, this.queueId, expectLogicOffset - currentLogicOffset);

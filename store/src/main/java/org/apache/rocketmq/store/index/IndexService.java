@@ -201,10 +201,13 @@ public class IndexService {
     public void buildIndex(DispatchRequest req) {
         IndexFile indexFile = retryGetAndCreateIndexFile();
         if (indexFile != null) {
+            // 获取结束物理索引
             long endPhyOffset = indexFile.getEndPhyOffset();
             DispatchRequest msg = req;
             String topic = msg.getTopic();
             String keys = msg.getKeys();
+            // 如果消息在 commitLog 中的偏移量小于该文件的结束索引在 commitLog 中的偏移量, 那么表示已为该消息之后的消息构建 Index 索引
+            // 此时直接返回，不需要创建索引
             if (msg.getCommitLogOffset() < endPhyOffset) {
                 return;
             }
@@ -215,10 +218,12 @@ public class IndexService {
                 case MessageSysFlag.TRANSACTION_PREPARED_TYPE:
                 case MessageSysFlag.TRANSACTION_COMMIT_TYPE:
                     break;
+                // 如果是事务回滚消息，则直接返回，不需要创建索引
                 case MessageSysFlag.TRANSACTION_ROLLBACK_TYPE:
                     return;
             }
-
+            // 获取客户端生成的 uniqKey，也被称为 msgId，从逻辑上代表客户端生成的唯一一条消息
+            // 如果 uniqKey 不为 null，那么为 uniqKey 构建索引
             if (req.getUniqKey() != null) {
                 indexFile = putKey(indexFile, msg, buildKey(topic, req.getUniqKey()));
                 if (indexFile == null) {
@@ -268,6 +273,7 @@ public class IndexService {
     public IndexFile retryGetAndCreateIndexFile() {
         IndexFile indexFile = null;
 
+        // 循环重试 3 次文件创建, 创建成功后跳出循环
         for (int times = 0; null == indexFile && times < MAX_TRY_IDX_CREATE; times++) {
             indexFile = this.getAndCreateLastIndexFile();
             if (null != indexFile)
@@ -297,13 +303,19 @@ public class IndexService {
 
         {
             this.readWriteLock.readLock().lock();
+            // 如果 indexFileList 不为空
             if (!this.indexFileList.isEmpty()) {
+                // 尝试获取最后一个 IndexFile
                 IndexFile tmp = this.indexFileList.get(this.indexFileList.size() - 1);
                 if (!tmp.isWriteFull()) {
+                    // 如果最后一个IndexFile没写满，则赋值给indexFile
                     indexFile = tmp;
                 } else {
+                    // 如果最后一个 IndexFile 写满了, 则创建新文件
+                    // 获取目前最后一个文件的 endPhyOffset 和 endPhyOffset 时间戳
                     lastUpdateEndPhyOffset = tmp.getEndPhyOffset();
                     lastUpdateIndexTimestamp = tmp.getEndTimestamp();
+                    // 记录上一个 IndexFil
                     prevIndexFile = tmp;
                 }
             }
@@ -313,6 +325,7 @@ public class IndexService {
 
         if (indexFile == null) {
             try {
+                // 获取完整文件名 $HOME/store/index${fileName}, fileName 是以创建时的时间戳命名的, 精确到毫秒
                 String fileName =
                     this.storePath + File.separator
                         + UtilAll.timeMillisToHumanString(System.currentTimeMillis());

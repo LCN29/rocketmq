@@ -49,7 +49,7 @@ public class CommitLogDispatcherCalcBitMap implements CommitLogDispatcher {
         if (!this.brokerConfig.isEnableCalcFilterBitMap()) {
             return;
         }
-
+        // 具体分析, 可以看 https://blog.csdn.net/jjhfen00/article/details/132176491
         try {
 
             Collection<ConsumerFilterData> filterDatas = consumerFilterManager.get(request.getTopic());
@@ -64,6 +64,7 @@ public class CommitLogDispatcherCalcBitMap implements CommitLogDispatcher {
             );
 
             long startTime = System.currentTimeMillis();
+            // 遍历所有注册的带有 SQL92 表达式的消费者，判断是否通过过滤，如果没有被过滤，则消费者名称的位映射，放入到 filterBitMap 中
             while (iterator.hasNext()) {
                 ConsumerFilterData filterData = iterator.next();
 
@@ -90,6 +91,7 @@ public class CommitLogDispatcherCalcBitMap implements CommitLogDispatcher {
 
                 // eval true
                 if (ret != null && ret instanceof Boolean && (Boolean) ret) {
+                    // 将消费组对应的位数据（由 "消费组#Topic" Hash 生成）保存到位数组中
                     consumerFilterManager.getBloomFilter().hashTo(
                         filterData.getBloomFilterData(),
                         filterBitMap
@@ -97,6 +99,7 @@ public class CommitLogDispatcherCalcBitMap implements CommitLogDispatcher {
                 }
             }
 
+            // 将所有没有被过滤的消费者名称计算出的位映射，放入 DispatchRequest 中，尝试存入 ConsumeQueueExt 文件中（如果开关开启）
             request.setBitMap(filterBitMap.bytes());
 
             long elapsedTime = UtilAll.computeElapsedTimeMilliseconds(startTime);

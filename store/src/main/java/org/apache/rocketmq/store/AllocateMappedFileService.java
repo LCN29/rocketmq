@@ -58,9 +58,9 @@ public class AllocateMappedFileService extends ServiceThread {
 
     /**
      * 添加分配请求, 并返回 MappedFile 对象
-     * @param nextFilePath
-     * @param nextNextFilePath
-     * @param fileSize
+     * @param nextFilePath 下一个文件
+     * @param nextNextFilePath 下下一个文件
+     * @param fileSize 文件大小
      * @return
      */
     public MappedFile putRequestAndReturnMappedFile(String nextFilePath, String nextNextFilePath, int fileSize) {
@@ -170,7 +170,7 @@ public class AllocateMappedFileService extends ServiceThread {
         boolean isSuccess = false;
         AllocateRequest req = null;
         try {
-            // 从队列中获取一个分配请求
+            // 从队列中获取一个分配请求, take 会移除元素
             req = this.requestQueue.take();
             // 这个分配请求需要再 map 中存在
             AllocateRequest expectedRequest = this.requestTable.get(req.getFilePath());

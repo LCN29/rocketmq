@@ -86,18 +86,24 @@ public class IndexFile {
     }
 
     public boolean putKey(final String key, final long phyOffset, final long storeTimestamp) {
+        // 如果当前文件的 index 索引数量小于 2000w, 则表明当前文件还可以继续构建索引
         if (this.indexHeader.getIndexCount() < this.indexNum) {
+            // 计算 key 的 hash 值, 一定的大于 0
             int keyHash = indexKeyHashMethod(key);
+            // 通过 keyHash & hash 槽数量(默认 500w) 的方式获取当前 key 对应的 hash 槽下标位置
             int slotPos = keyHash % this.hashSlotNum;
+            // 计算该消息的绝对 hash 槽偏移量 absSlotPos = 40 + slotPos (上一步计算到的 hash 位置) * 4
             int absSlotPos = IndexHeader.INDEX_HEADER_SIZE + slotPos * hashSlotSize;
 
             try {
-
+                // 通过 absSlotPos 获取当前 hash 槽的值
                 int slotValue = this.mappedByteBuffer.getInt(absSlotPos);
+                // 如果当前 hash 槽的值 <= 0 (存在 hash 冲突) 或者大于当前索引数量
                 if (slotValue <= invalidIndex || slotValue > this.indexHeader.getIndexCount()) {
+                    // 将当前 hash 槽的值设置为 0
                     slotValue = invalidIndex;
                 }
-
+                // 当前消息在 commitLog 中的消息存储时间与该 Index 文件起始时间差
                 long timeDiff = storeTimestamp - this.indexHeader.getBeginTimestamp();
 
                 timeDiff = timeDiff / 1000;
@@ -110,25 +116,33 @@ public class IndexFile {
                     timeDiff = 0;
                 }
 
+                // 获取该消息的索引存放位置的绝对偏移量 absIndexPos = 40B + 500w * 4B + indexCount * 20B
                 int absIndexPos =
                     IndexHeader.INDEX_HEADER_SIZE + this.hashSlotNum * hashSlotSize
                         + this.indexHeader.getIndexCount() * indexSize;
 
+                // 将 key 的 hash 值写入到 absIndexPos 位置
                 this.mappedByteBuffer.putInt(absIndexPos, keyHash);
+                // 将消息在 commitLog 中的物理偏移量写入到 absIndexPos + 4 位置
                 this.mappedByteBuffer.putLong(absIndexPos + 4, phyOffset);
+                // 将消息在 commitLog 中的消息存储时间与该 Index 文件起始时间差写入到 absIndexPos + 4 + 8 位置
                 this.mappedByteBuffer.putInt(absIndexPos + 4 + 8, (int) timeDiff);
+                // 将当前 hash 槽的值写入到 absIndexPos + 4 + 8 + 4 位置
                 this.mappedByteBuffer.putInt(absIndexPos + 4 + 8 + 4, slotValue);
-
+                // 更新当前 hash 槽的值为最新的 IndexFile 的索引条目计数的编号, 也就是当前索引存入的编号
                 this.mappedByteBuffer.putInt(absSlotPos, this.indexHeader.getIndexCount());
 
+                // 如果索引数量小于等于 1, 说明时该文件第一次存入索引, 那么初始化 beginPhyOffset 和 beginTimestamp
                 if (this.indexHeader.getIndexCount() <= 1) {
                     this.indexHeader.setBeginPhyOffset(phyOffset);
                     this.indexHeader.setBeginTimestamp(storeTimestamp);
                 }
 
+                // 如果 slotValue 为 0, 表示采用了一个新的哈希槽，此时 hashSlotCount 自增 1 (hash 冲突, 使用同一个 hash 槽)
                 if (invalidIndex == slotValue) {
                     this.indexHeader.incHashSlotCount();
                 }
+                // 更新 IndexFile 的索引条目计数 + beginPhyOffset 和 beginTimestamp
                 this.indexHeader.incIndexCount();
                 this.indexHeader.setEndPhyOffset(phyOffset);
                 this.indexHeader.setEndTimestamp(storeTimestamp);

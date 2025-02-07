@@ -1115,11 +1115,11 @@ public class CommitLog {
         public void run() {
             CommitLog.log.info(this.getServiceName() + " service started");
             while (!this.isStopped()) {
-                // 获取刷新数据到 FileChannel 的时间间隔
+                // 获取提交间隔时间 (获取刷新数据到 FileChannel 的时间间隔), 默认 200ms
                 int interval = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitIntervalCommitLog();
-                // 获取每次刷新数据到 FileChannel 的页数
+                // 获取提交的最少页数 (每次刷新数据到 FileChannel 的页数), 默认 4, 即 16k
                 int commitDataLeastPages = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitCommitLogLeastPages();
-                // 2 次提交的最大时间间隔
+                // 获取 2 次提交最长延迟间隔时间，默认 10s, 即距离上一次刷盘超过 10s 时，不管页数是否超过 4, 都会刷盘
                 int commitDataThoroughInterval =
                     CommitLog.this.defaultMessageStore.getMessageStoreConfig().getCommitCommitLogThoroughInterval();
 
@@ -1156,7 +1156,7 @@ public class CommitLog {
 
             // 线程进入销毁阶段
             boolean result = false;
-            // 进行多次重试, 确保消息提交了
+            // 进行 10 次重试, 确保消息提交了
             for (int i = 0; i < RETRY_TIMES_OVER && !result; i++) {
                 result = CommitLog.this.mappedFileQueue.commit(0);
                 CommitLog.log.info(this.getServiceName() + " service shutdown, retry " + (i + 1) + " times " + (result ? "OK" : "Not OK"));
@@ -1178,9 +1178,9 @@ public class CommitLog {
                 boolean flushCommitLogTimed = CommitLog.this.defaultMessageStore.getMessageStoreConfig().isFlushCommitLogTimed();
                 // 刷新数据到磁盘的间隔 500ms
                 int interval = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushIntervalCommitLog();
-                // 每次刷盘的页数
+                // 获取刷盘的最少页数，默认 4，即 16k
                 int flushPhysicQueueLeastPages = CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogLeastPages();
-                // 2 次刷盘的时间间隔最大相隔时间 1000 * 10ms
+                // 获取 2 次刷盘最长延迟间隔时间，默认 10s, 即距离上一次刷盘超过 10s 时，不管页数是否超过 4, 都会刷盘
                 int flushPhysicQueueThoroughInterval =
                     CommitLog.this.defaultMessageStore.getMessageStoreConfig().getFlushCommitLogThoroughInterval();
 
@@ -1188,8 +1188,10 @@ public class CommitLog {
 
                 // Print flush progress
                 long currentTimeMillis = System.currentTimeMillis();
+                // 2 次刷盘时间间隔超过配置了
                 if (currentTimeMillis >= (this.lastFlushTimestamp + flushPhysicQueueThoroughInterval)) {
                     this.lastFlushTimestamp = currentTimeMillis;
+                    // 最少刷盘页数为 0, 即不管页数是否超过 4, 都会刷盘
                     flushPhysicQueueLeastPages = 0;
                     printFlushProgress = (printTimes++ % 10) == 0;
                 }
@@ -1213,7 +1215,7 @@ public class CommitLog {
                     // 分析 lastFlushTimestamp 变量的逻辑
                     CommitLog.this.mappedFileQueue.flush(flushPhysicQueueLeastPages);
 
-                    // 更新 checkPoint 的 commitLog 最新消息的写入时间
+                    // 获取存储时间戳更新,  checkPoint 的 commitLog 最新消息的写入时间
                     long storeTimestamp = CommitLog.this.mappedFileQueue.getStoreTimestamp();
                     if (storeTimestamp > 0) {
                         CommitLog.this.defaultMessageStore.getStoreCheckpoint().setPhysicMsgTimestamp(storeTimestamp);
