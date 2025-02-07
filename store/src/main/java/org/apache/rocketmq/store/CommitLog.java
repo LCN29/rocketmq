@@ -1302,7 +1302,7 @@ public class CommitLog {
                 // 遍历所有的读列表中的请求
                 for (GroupCommitRequest req : this.requestsRead) {
                     // There may be a message in the next file, so a maximum of two times the flush
-                    // 刷入的位置已经超过期望刷入的位置, 不用处理了, 直接刷入成功
+                    // 已经刷入的位置已经超过期望刷入的位置, 不用处理了, 直接刷入成功
                     boolean flushOK = CommitLog.this.mappedFileQueue.getFlushedWhere() >= req.getNextOffset();
                     for (int i = 0; i < 2 && !flushOK; i++) {
                         // 刷盘

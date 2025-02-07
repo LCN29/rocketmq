@@ -142,6 +142,10 @@ public class MessageStoreConfig {
      * 2 次提交的时间超过了这个时间, 就立即将所有的页数据都提交, 否则按照配置的每次多少页提交
      */
     private int commitCommitLogThoroughInterval = 200;
+
+    /**
+     * ConsumerQueue 2 次刷盘的时间间隔
+     */
     private int flushConsumeQueueThoroughInterval = 1000 * 60;
     @ImportantField
     private int maxTransferBytesOnMessageInMemory = 1024 * 256;

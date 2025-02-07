@@ -229,6 +229,7 @@ public class MappedFileQueue {
     protected MappedFile doCreateMappedFile(String nextFilePath, String nextNextFilePath) {
         MappedFile mappedFile = null;
 
+        // 没有分配线程, 则由当前线程创建 MappedFile
         if (this.allocateMappedFileService != null) {
             mappedFile = this.allocateMappedFileService.putRequestAndReturnMappedFile(nextFilePath,
                     nextNextFilePath, this.mappedFileSize);

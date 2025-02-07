@@ -2031,6 +2031,7 @@ public class DefaultMessageStore implements MessageStore {
         private long lastFlushTimestamp = 0;
 
         private void doFlush(int retryTimes) {
+            // 获取 consumerQueue 刷盘最小页数，默认 2 页
             int flushConsumeQueueLeastPages = DefaultMessageStore.this.getMessageStoreConfig().getFlushConsumeQueueLeastPages();
 
             if (retryTimes == RETRY_TIMES_OVER) {
@@ -2039,29 +2040,41 @@ public class DefaultMessageStore implements MessageStore {
 
             long logicsMsgTimestamp = 0;
 
+            // 获取 consumerQueue 刷盘间隔，默认 60s
             int flushConsumeQueueThoroughInterval = DefaultMessageStore.this.getMessageStoreConfig().getFlushConsumeQueueThoroughInterval();
             long currentTimeMillis = System.currentTimeMillis();
+            // 如果当前时间 大于等于 上次刷盘时间 + 2 次刷盘间隔时间
             if (currentTimeMillis >= (this.lastFlushTimestamp + flushConsumeQueueThoroughInterval)) {
+                // 则将上次刷盘时间设置为当前时间
                 this.lastFlushTimestamp = currentTimeMillis;
                 flushConsumeQueueLeastPages = 0;
+                // 获取 check point 中的维护的 logicsMsgTimestamp, 上次刷盘的时间
                 logicsMsgTimestamp = DefaultMessageStore.this.getStoreCheckpoint().getLogicsMsgTimestamp();
             }
 
+            // 获取 Map<Topic 名称, Map<队列编号, 消费队列信息>>
             ConcurrentMap<String, ConcurrentMap<Integer, ConsumeQueue>> tables = DefaultMessageStore.this.consumeQueueTable;
 
+            // 遍历所有的消费队列
             for (ConcurrentMap<Integer, ConsumeQueue> maps : tables.values()) {
                 for (ConsumeQueue cq : maps.values()) {
                     boolean result = false;
                     for (int i = 0; i < retryTimes && !result; i++) {
+                        // 调用 ConsumeQueue#flush 方法刷盘, 内部实际还是调用 MappedFileQueue mappedFileQueue 的 flush 方法
                         result = cq.flush(flushConsumeQueueLeastPages);
                     }
                 }
             }
 
             if (0 == flushConsumeQueueLeastPages) {
+                // 这次强制刷盘了
                 if (logicsMsgTimestamp > 0) {
+                    // logicsMsgTimestamp = DefaultMessageStore.this.getStoreCheckpoint().getLogicsMsgTimestamp()
+                    // 从 check point 获取后又设置回去，作用 ??
+                    // 设置最新的 logicsMsgTimestamp 到 check point 中
                     DefaultMessageStore.this.getStoreCheckpoint().setLogicsMsgTimestamp(logicsMsgTimestamp);
                 }
+                // check point 也强制刷盘
                 DefaultMessageStore.this.getStoreCheckpoint().flush();
             }
         }
@@ -2071,7 +2084,9 @@ public class DefaultMessageStore implements MessageStore {
 
             while (!this.isStopped()) {
                 try {
+                    // 获取 consumerQueue 刷盘间隔，默认 1000ms
                     int interval = DefaultMessageStore.this.getMessageStoreConfig().getFlushIntervalConsumeQueue();
+                    // 沉睡 interval 时间
                     this.waitForRunning(interval);
                     this.doFlush(1);
                 } catch (Exception e) {
