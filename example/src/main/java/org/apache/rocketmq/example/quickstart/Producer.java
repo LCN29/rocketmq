@@ -22,6 +22,8 @@ import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
 
+import java.time.LocalDate;
+
 /**
  * This class demonstrates how to send messages to brokers using provided {@link DefaultMQProducer}.
  */
@@ -54,7 +56,6 @@ public class Producer {
          * </pre>
          */
         // Uncomment the following line while debugging, namesrvAddr should be set to your local address
-//        producer.setNamesrvAddr(DEFAULT_NAMESRVADDR);
         producer.setNamesrvAddr(DEFAULT_NAMESRVADDR);
 
         /*
@@ -65,20 +66,20 @@ public class Producer {
         for (int i = 0; i < MESSAGE_COUNT; i++) {
             try {
 
+                String today = LocalDate.now().toString();
+                byte[] messageByte = ("Hello RocketMQ: " + i + ". Today is" + today).getBytes(RemotingHelper.DEFAULT_CHARSET);
+
                 /*
                  * Create a message instance, specifying topic, tag and message body.
                  */
-                Message msg = new Message(TOPIC /* Topic */,
-                    TAG /* Tag */,
-                    ("Hello RocketMQ " + i).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
-                );
+                Message msg = new Message(TOPIC, TAG, messageByte);
 
                 /*
                  * Call send message to deliver message to one of brokers.
                  */
                 // 获取发送结果
-                //SendResult sendResult = producer.send(msg);
-                producer.sendOneway(msg);
+                SendResult sendResult = producer.send(msg);
+                //producer.sendOneway(msg);
 
                 /*
                  * There are different ways to send message, if you don't care about the send result,you can use this way
@@ -114,7 +115,7 @@ public class Producer {
                  *}
                  */
 
-             //   System.out.printf("%s%n", sendResult);
+                System.out.printf("%s%n", sendResult);
             } catch (Exception e) {
                 e.printStackTrace();
                 Thread.sleep(1000);
