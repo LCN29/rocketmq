@@ -117,6 +117,8 @@ public class IndexFile {
                 }
 
                 // 获取该消息的索引存放位置的绝对偏移量 absIndexPos = 40B + 500w * 4B + indexCount * 20B
+                // 计算当前索引存放的位置
+                // 当前 key 存放的位置, 默认就是下一个消息的位置 头部的大小 + hash 槽数量 * hash 槽大小 + 已有索引数量 * 索引条目大小
                 int absIndexPos =
                     IndexHeader.INDEX_HEADER_SIZE + this.hashSlotNum * hashSlotSize
                         + this.indexHeader.getIndexCount() * indexSize;
